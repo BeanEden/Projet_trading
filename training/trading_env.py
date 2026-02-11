@@ -153,6 +153,9 @@ class TradingEnv(gym.Env):
             observation, reward, terminated, truncated, info
         """
         # Map action → signal
+        if isinstance(action, np.ndarray):
+            action = int(action)
+
         action_map = {0: 0, 1: 1, 2: -1}
         signal = action_map[action]
 
