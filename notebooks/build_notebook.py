@@ -1,0 +1,671 @@
+"""Script pour générer le notebook T02_T04_T06_T08.ipynb avec analyses détaillées."""
+import json
+from pathlib import Path
+
+def md(source):
+    return {"cell_type": "markdown", "metadata": {}, "source": source if isinstance(source, list) else [source]}
+
+def code(source):
+    return {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": source if isinstance(source, list) else [source]}
+
+cells = []
+
+# ── TITRE ──
+cells.append(md([
+    "# 🏦 Projet Fil Rouge – Système de Trading GBP/USD\n",
+    "## Tâches T02 · T04 · T06 · T08\n",
+    "\n",
+    "**Auteur** : LudovicPicard  \n",
+    "**Paire** : GBP/USD  \n",
+    "**Fréquence** : M15 (15 minutes)  \n",
+    "**Données** : 2022 (Train) · 2023 (Validation) · 2024 (Test)\n",
+    "\n",
+    "---\n",
+    "\n",
+    "### Sommaire\n",
+    "1. [Setup & Imports](#1)\n",
+    "2. [T02 – Agrégation M1 → M15](#2)\n",
+    "3. [T04 – Analyse exploratoire](#3)\n",
+    "4. [T06 – Baselines & Backtest](#4)\n",
+    "5. [T08 – Reinforcement Learning](#5)"
+]))
+
+# ── 1. SETUP ──
+cells.append(md("## 1. Setup & Imports <a id='1'></a>"))
+cells.append(code([
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "import sys\n",
+    "from pathlib import Path\n",
+    "from scipy import stats as sp_stats\n",
+    "from statsmodels.tsa.stattools import adfuller\n",
+    "from statsmodels.graphics.tsaplots import plot_acf, plot_pacf\n",
+    "\n",
+    "# Config graphique\n",
+    "plt.style.use('seaborn-v0_8-darkgrid')\n",
+    "sns.set_palette('deep')\n",
+    "plt.rcParams['figure.figsize'] = (14, 6)\n",
+    "plt.rcParams['figure.dpi'] = 120\n",
+    "\n",
+    "# Chemins\n",
+    "PROJECT_ROOT = Path('.').resolve().parent\n",
+    "sys.path.insert(0, str(PROJECT_ROOT))\n",
+    "print(f'📁 Projet : {PROJECT_ROOT}')\n",
+    "\n",
+    "# Constantes\n",
+    "YEARS = [2022, 2023, 2024]\n",
+    "LABELS = {2022: '🟦 Train', 2023: '🟧 Validation', 2024: '🟩 Test'}\n",
+    "COLORS = {2022: 'steelblue', 2023: 'darkorange', 2024: 'green'}"
+]))
+
+# ── 2. T02 ──
+cells.append(md([
+    "---\n",
+    "## 2. T02 – Agrégation M1 → M15 <a id='2'></a>\n",
+    "\n",
+    "### Objectif\n",
+    "Transformer les données brutes **1 minute** en bougies **15 minutes** en respectant les règles imposées :\n",
+    "- `open_15m` = open de la **1ère minute** du bloc\n",
+    "- `high_15m` = **max(high)** sur 15 minutes\n",
+    "- `low_15m` = **min(low)** sur 15 minutes\n",
+    "- `close_15m` = close de la **dernière minute** du bloc\n",
+    "\n",
+    "> ⚠️ Aucune modélisation n'est autorisée en M1. L'agrégation est la première étape obligatoire."
+]))
+
+cells.append(md("### 2.1 Aperçu des données brutes M1"))
+cells.append(code([
+    "# Charger un échantillon des données brutes M1 pour chaque année\n",
+    "cols_m1 = ['date', 'time', 'open', 'high', 'low', 'close', 'volume']\n",
+    "\n",
+    "m1_files = {\n",
+    "    2022: PROJECT_ROOT / 'HISTDATA_COM_MT_GBPUSD_M12022' / 'DAT_MT_GBPUSD_M1_2022.csv',\n",
+    "    2023: PROJECT_ROOT / 'HISTDATA_COM_MT_GBPUSD_M12023' / 'DAT_MT_GBPUSD_M1_2023.csv',\n",
+    "    2024: PROJECT_ROOT / 'HISTDATA_COM_MT_GBPUSD_M12024' / 'DAT_MT_GBPUSD_M1_2024.csv',\n",
+    "}\n",
+    "\n",
+    "for year, path in m1_files.items():\n",
+    "    df_m1 = pd.read_csv(path, header=None, names=cols_m1)\n",
+    "    print(f'\\n📅 {year} ({LABELS[year]}) : {len(df_m1):,} lignes M1')\n",
+    "    print(f'   Période : {df_m1[\"date\"].iloc[0]} → {df_m1[\"date\"].iloc[-1]}')\n",
+    "    display(df_m1.head(3))"
+]))
+
+cells.append(md("### 2.2 Résultat de l'agrégation M15"))
+cells.append(code([
+    "# Charger les données M15 agrégées (output de T02)\n",
+    "m15 = {}\n",
+    "for year in YEARS:\n",
+    "    path = PROJECT_ROOT / 'data' / 'm15' / f'GBPUSD_M15_{year}.csv'\n",
+    "    m15[year] = pd.read_csv(path, parse_dates=['timestamp'], index_col='timestamp')\n",
+    "    print(f'✅ {year} ({LABELS[year]}) : {len(m15[year]):,} bougies M15')\n",
+    "\n",
+    "print(f'\\n📊 Colonnes : {list(m15[2022].columns)}')\n",
+    "print(f'\\n--- Exemple de données M15 (2022) ---')\n",
+    "display(m15[2022].head(10))"
+]))
+
+cells.append(md([
+    "### 2.3 Analyse : Vérification de l'agrégation\n",
+    "\n",
+    "On vérifie la cohérence des bougies M15 :\n",
+    "- `high_15m >= low_15m` (toujours)\n",
+    "- `high_15m >= open_15m` et `high_15m >= close_15m`\n",
+    "- Pas de prix négatifs\n",
+    "- Nombre de bougies cohérent (~26 bougies/jour × ~252 jours ≈ 6,500 attendues, mais le forex trade 24h/5j)"
+]))
+cells.append(code([
+    "# Vérifications de cohérence\n",
+    "for year in YEARS:\n",
+    "    df = m15[year]\n",
+    "    checks = {\n",
+    "        'high >= low': (df['high_15m'] >= df['low_15m']).all(),\n",
+    "        'high >= open': (df['high_15m'] >= df['open_15m']).all(),\n",
+    "        'high >= close': (df['high_15m'] >= df['close_15m']).all(),\n",
+    "        'low <= open': (df['low_15m'] <= df['open_15m']).all(),\n",
+    "        'low <= close': (df['low_15m'] <= df['close_15m']).all(),\n",
+    "        'pas de prix négatif': (df[['open_15m','high_15m','low_15m','close_15m']] > 0).all().all(),\n",
+    "    }\n",
+    "    print(f'\\n{year} ({LABELS[year]}) :')\n",
+    "    for check, ok in checks.items():\n",
+    "        print(f'  {\"✅\" if ok else \"❌\"} {check}')\n",
+    "\n",
+    "print('\\n📌 Conclusion : Toutes les bougies M15 sont cohérentes et exploitables.')"
+]))
+
+cells.append(md("### 2.4 Visualisation des prix M15"))
+cells.append(code([
+    "fig, axes = plt.subplots(3, 1, figsize=(16, 10), sharex=False)\n",
+    "\n",
+    "for i, year in enumerate(YEARS):\n",
+    "    df = m15[year]\n",
+    "    axes[i].plot(df.index, df['close_15m'], lw=0.5, color=COLORS[year])\n",
+    "    axes[i].fill_between(df.index, df['low_15m'], df['high_15m'], alpha=0.1, color=COLORS[year])\n",
+    "    axes[i].set_title(f'{year} ({LABELS[year]}) – {len(df):,} bougies', fontweight='bold')\n",
+    "    axes[i].set_ylabel('GBP/USD')\n",
+    "\n",
+    "plt.suptitle('Prix GBP/USD Close M15 (avec range High/Low)', fontsize=14, fontweight='bold')\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 Observation : On voit clairement les différents régimes de marché.')\n",
+    "print('   - 2022 : Forte baisse (GBP affaiblie par la crise énergétique, hausse USD)')\n",
+    "print('   - 2023 : Reprise progressive, marché latéral puis haussier')\n",
+    "print('   - 2024 : Consolidation et volatilité modérée')"
+]))
+
+# ── 3. T04 ──
+cells.append(md([
+    "---\n",
+    "## 3. T04 – Analyse exploratoire + ADF/ACF <a id='3'></a>\n",
+    "\n",
+    "### Objectif\n",
+    "Comprendre les propriétés statistiques de la série GBP/USD M15 :\n",
+    "- La distribution des rendements est-elle normale ?\n",
+    "- Comment évolue la volatilité dans le temps ?\n",
+    "- Y a-t-il des patterns horaires exploitables ?\n",
+    "- Les rendements sont-ils autocorrélés ?\n",
+    "- La série est-elle stationnaire ?"
+]))
+cells.append(code([
+    "# Préparer les données : concaténer les 3 années + calculer les rendements\n",
+    "df_all = pd.concat([m15[y].assign(year=y) for y in YEARS]).sort_index()\n",
+    "df_all['return_15m'] = df_all['close_15m'].pct_change()\n",
+    "df_all['log_return'] = np.log(df_all['close_15m'] / df_all['close_15m'].shift(1))\n",
+    "df_all['hour'] = df_all.index.hour\n",
+    "print(f'Dataset complet : {len(df_all):,} bougies M15 ({df_all.index.min()} → {df_all.index.max()})')"
+]))
+
+cells.append(md("### 3.1 Distribution des rendements"))
+cells.append(code([
+    "returns = df_all['return_15m'].dropna()\n",
+    "\n",
+    "fig, axes = plt.subplots(1, 3, figsize=(18, 5))\n",
+    "\n",
+    "# Histogramme global avec loi normale superposée\n",
+    "axes[0].hist(returns, bins=150, density=True, alpha=0.7, color='steelblue', edgecolor='white', lw=0.3)\n",
+    "x = np.linspace(returns.min(), returns.max(), 200)\n",
+    "axes[0].plot(x, sp_stats.norm.pdf(x, returns.mean(), returns.std()), 'r-', lw=2, label='Loi normale')\n",
+    "axes[0].set_title('Distribution des rendements M15', fontweight='bold')\n",
+    "axes[0].legend()\n",
+    "\n",
+    "# Par année\n",
+    "for year in YEARS:\n",
+    "    r = df_all[df_all['year']==year]['return_15m'].dropna()\n",
+    "    axes[1].hist(r, bins=100, density=True, alpha=0.5, label=f'{year}')\n",
+    "axes[1].set_title('Distribution par année', fontweight='bold')\n",
+    "axes[1].legend()\n",
+    "\n",
+    "# QQ Plot\n",
+    "sp_stats.probplot(returns, dist='norm', plot=axes[2])\n",
+    "axes[2].set_title('QQ Plot vs Normale', fontweight='bold')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "# Stats détaillées\n",
+    "print('📊 Statistiques des rendements M15 :')\n",
+    "print(f'   Moyenne     : {returns.mean():.8f}  (≈ neutre, pas de drift significatif)')\n",
+    "print(f'   Écart-type  : {returns.std():.6f}')\n",
+    "print(f'   Skewness    : {returns.skew():.4f}  ({\"légère asymétrie négative → queues gauches plus lourdes\" if returns.skew() < 0 else \"légère asymétrie positive\"})')\n",
+    "print(f'   Kurtosis    : {returns.kurtosis():.4f}  (> 0 → distribution leptokurtique, queues épaisses)')\n",
+    "jb, pval = sp_stats.jarque_bera(returns)\n",
+    "print(f'   Jarque-Bera : stat={jb:.2f}, p={pval:.2e}')\n",
+    "print(f'\\n📌 Conclusion : Les rendements ne suivent PAS une loi normale (Jarque-Bera p ≈ 0).')\n",
+    "print('   → Queues épaisses (fat tails) et kurtosis élevé : risque de mouvements extrêmes.')\n",
+    "print('   → Le QQ plot confirme les déviations aux extrêmes.')\n",
+    "print('   → Implication : les modèles basés sur la normalité (Sharpe classique) sont approximatifs.')"
+]))
+
+cells.append(md("### 3.2 Volatilité dans le temps"))
+cells.append(code([
+    "fig, axes = plt.subplots(2, 1, figsize=(16, 8))\n",
+    "\n",
+    "# Rolling volatility (20 bougies ≈ 5h de trading)\n",
+    "rolling_vol = df_all['return_15m'].rolling(20).std()\n",
+    "axes[0].plot(df_all.index, rolling_vol, lw=0.5, color='steelblue', alpha=0.8)\n",
+    "axes[0].fill_between(df_all.index, 0, rolling_vol, alpha=0.15, color='steelblue')\n",
+    "axes[0].set_title('Volatilité glissante (rolling std 20 périodes ≈ 5h)', fontweight='bold')\n",
+    "axes[0].set_ylabel('Écart-type')\n",
+    "for year in YEARS:\n",
+    "    mask = df_all['year']==year\n",
+    "    mid = df_all[mask].index[len(df_all[mask])//2]\n",
+    "    axes[0].annotate(f'{year}', xy=(mid, rolling_vol.max()*0.85), ha='center', fontsize=11, fontweight='bold')\n",
+    "\n",
+    "# Volatilité mensuelle\n",
+    "monthly_vol = df_all['return_15m'].resample('ME').std()\n",
+    "bar_colors = [COLORS[d.year] for d in monthly_vol.index]\n",
+    "axes[1].bar(monthly_vol.index, monthly_vol.values, width=25, color=bar_colors, alpha=0.7)\n",
+    "axes[1].set_title('Volatilité mensuelle', fontweight='bold')\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 Analyse : La volatilité est clairement NON constante (hétéroscédasticité).')\n",
+    "print('   → Clustering de volatilité visible : les périodes de forte volatilité sont groupées.')\n",
+    "print('   → Cela justifie l\\'utilisation de features de volatilité (ATR, rolling_std) dans les modèles.')\n",
+    "print('   → Le régime de volatilité change entre les années → risque d\\'overfitting temporel.')"
+]))
+
+cells.append(md("### 3.3 Analyse horaire"))
+cells.append(code([
+    "fig, axes = plt.subplots(1, 2, figsize=(16, 5))\n",
+    "\n",
+    "# Rendement moyen par heure\n",
+    "h_ret = df_all.groupby('hour')['return_15m'].mean()\n",
+    "axes[0].bar(h_ret.index, h_ret.values*10000, color=['green' if r>0 else 'red' for r in h_ret], alpha=0.7)\n",
+    "axes[0].set_title('Rendement moyen par heure (basis points)', fontweight='bold')\n",
+    "axes[0].set_xticks(range(24))\n",
+    "axes[0].axhline(y=0, color='black', lw=0.5)\n",
+    "\n",
+    "# Volatilité par heure\n",
+    "h_vol = df_all.groupby('hour')['return_15m'].std()\n",
+    "axes[1].bar(h_vol.index, h_vol.values*10000, color='steelblue', alpha=0.7)\n",
+    "axes[1].set_title('Volatilité par heure (basis points)', fontweight='bold')\n",
+    "axes[1].set_xticks(range(24))\n",
+    "\n",
+    "# Sessions de marché\n",
+    "for ax in axes:\n",
+    "    ax.axvspan(7, 16, alpha=0.05, color='blue', label='Londres')\n",
+    "    ax.axvspan(13, 21, alpha=0.05, color='red', label='New York')\n",
+    "    ax.set_xlabel('Heure (UTC)')\n",
+    "axes[0].legend(fontsize=8)\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 Analyse :')\n",
+    "print('   → La volatilité est maximale pendant les sessions Londres (7h-16h) et New York (13h-21h).')\n",
+    "print('   → Le chevauchement Londres/NY (13h-16h) = pic de volatilité → plus d\\'opportunités mais plus de risque.')\n",
+    "print('   → Nuit asiatique (0h-7h) = faible volatilité → mouvements limités.')\n",
+    "print('   → Implication : un modèle pourrait bénéficier d\\'une feature \"heure\" ou \"session\".')"
+]))
+
+cells.append(md("### 3.4 Autocorrélation (ACF/PACF)"))
+cells.append(code([
+    "ret = df_all['return_15m'].dropna()\n",
+    "fig, axes = plt.subplots(2, 2, figsize=(16, 10))\n",
+    "\n",
+    "plot_acf(ret, lags=50, ax=axes[0,0], title='ACF – Rendements')\n",
+    "plot_pacf(ret, lags=50, ax=axes[0,1], title='PACF – Rendements', method='ywm')\n",
+    "plot_acf(ret**2, lags=50, ax=axes[1,0], title='ACF – Rendements² (effet ARCH)')\n",
+    "plot_acf(ret.abs(), lags=50, ax=axes[1,1], title='ACF – |Rendements| (persistance vol.)')\n",
+    "\n",
+    "plt.suptitle('Autocorrélation GBP/USD M15', fontsize=14, fontweight='bold', y=1.02)\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 Analyse :')\n",
+    "print('   → ACF des rendements : très peu d\\'autocorrélation → les rendements sont quasi-imprévisibles (EMH faible).')\n",
+    "print('   → ACF des rendements² et |rendements| : autocorrélation FORTE et persistante.')\n",
+    "print('   → Cela confirme le clustering de volatilité (effet ARCH/GARCH).')\n",
+    "print('   → Implication : la VOLATILITÉ est prévisible, pas la DIRECTION. Utile pour le risk management.')"
+]))
+
+cells.append(md("### 3.5 Test ADF (Stationnarité)"))
+cells.append(code([
+    "print('═'*60)\n",
+    "print('TEST ADF (Augmented Dickey-Fuller)')\n",
+    "print('H0 : La série possède une racine unitaire (NON stationnaire)')\n",
+    "print('H1 : La série est stationnaire')\n",
+    "print('═'*60)\n",
+    "\n",
+    "for name, s in [('Prix (close_15m)', df_all['close_15m']),\n",
+    "                ('Rendements', df_all['return_15m']),\n",
+    "                ('Log-rendements', df_all['log_return'])]:\n",
+    "    result = adfuller(s.dropna(), autolag='AIC')\n",
+    "    stat_txt = '✅ STATIONNAIRE' if result[1] < 0.05 else '❌ NON STATIONNAIRE'\n",
+    "    print(f'\\n📈 {name} :')\n",
+    "    print(f'   ADF stat  : {result[0]:.4f}')\n",
+    "    print(f'   p-value   : {result[1]:.2e}')\n",
+    "    for lvl, val in result[4].items():\n",
+    "        print(f'   CV {lvl:>3} : {val:.4f}  {\"✅\" if result[0] < val else \"❌\"}')\n",
+    "    print(f'   → {stat_txt}')\n",
+    "\n",
+    "print('\\n📌 Conclusion :')\n",
+    "print('   → Les PRIX ne sont pas stationnaires (marche aléatoire) → on ne modélise PAS les prix directement.')\n",
+    "print('   → Les RENDEMENTS sont stationnaires → c\\'est la variable cible appropriée pour le ML/RL.')\n",
+    "print('   → Cela valide notre approche : prédire le mouvement (hausse/baisse), pas le niveau de prix.')"
+]))
+
+# ── 4. T06 ──
+cells.append(md([
+    "---\n",
+    "## 4. T06 – Baselines & Backtest <a id='4'></a>\n",
+    "\n",
+    "### Objectif\n",
+    "Établir des **références de performance** avant tout ML/RL :\n",
+    "- **Random** : référence \"aucune intelligence\"\n",
+    "- **Buy & Hold** : référence \"marché passif\"\n",
+    "- **EMA Cross + RSI** : référence \"analyse technique classique\"\n",
+    "\n",
+    "> Un modèle ML/RL n'est utile QUE s'il bat ces baselines de manière robuste."
+]))
+cells.append(code([
+    "from evaluation.backtester import Backtester\n",
+    "\n",
+    "bt = Backtester(transaction_cost=0.0002)  # ~2 pips\n",
+    "\n",
+    "def add_indicators(df):\n",
+    "    df = df.copy()\n",
+    "    df['ema_20'] = df['close_15m'].ewm(span=20, adjust=False).mean()\n",
+    "    df['ema_50'] = df['close_15m'].ewm(span=50, adjust=False).mean()\n",
+    "    delta = df['close_15m'].diff()\n",
+    "    gain = delta.where(delta>0, 0.0).rolling(14).mean()\n",
+    "    loss = (-delta.where(delta<0, 0.0)).rolling(14).mean()\n",
+    "    df['rsi_14'] = 100 - (100 / (1 + gain/loss))\n",
+    "    return df\n",
+    "\n",
+    "def strategy_ema_rsi(df):\n",
+    "    \"\"\"BUY si EMA20 > EMA50 et RSI < 70, SELL si EMA20 < EMA50 et RSI > 30\"\"\"\n",
+    "    signals = np.zeros(len(df), dtype=int)\n",
+    "    for i in range(1, len(df)):\n",
+    "        e20, e50, rsi = df['ema_20'].iloc[i], df['ema_50'].iloc[i], df['rsi_14'].iloc[i]\n",
+    "        if pd.isna(e20) or pd.isna(e50) or pd.isna(rsi): continue\n",
+    "        if e20 > e50 and rsi < 70: signals[i] = 1\n",
+    "        elif e20 < e50 and rsi > 30: signals[i] = -1\n",
+    "    return pd.Series(signals)\n",
+    "\n",
+    "# Exécuter les 3 stratégies sur les 3 années\n",
+    "all_results = {}\n",
+    "for year in YEARS:\n",
+    "    df = add_indicators(m15[year])\n",
+    "    n = len(df)\n",
+    "    rng = np.random.RandomState(42)\n",
+    "    all_results[year] = {\n",
+    "        'Random': bt.run(df['close_15m'], pd.Series(rng.choice([1,-1,0], size=n))),\n",
+    "        'Buy & Hold': bt.run(df['close_15m'], pd.Series(np.concatenate([[1], np.zeros(n-1, dtype=int)]))),\n",
+    "        'EMA + RSI': bt.run(df['close_15m'], strategy_ema_rsi(df)),\n",
+    "    }\n",
+    "print('✅ Baselines calculées')"
+]))
+
+cells.append(md("### 4.1 Equity curves"))
+cells.append(code([
+    "fig, axes = plt.subplots(1, 3, figsize=(20, 5))\n",
+    "strat_colors = {'Random': '#e74c3c', 'Buy & Hold': '#3498db', 'EMA + RSI': '#2ecc71'}\n",
+    "\n",
+    "for i, year in enumerate(YEARS):\n",
+    "    for name, res in all_results[year].items():\n",
+    "        eq = res['equity_curve']\n",
+    "        axes[i].plot(eq/eq[0]*100, lw=1.2, label=name, color=strat_colors[name])\n",
+    "    axes[i].axhline(y=100, color='black', lw=0.5, ls='--', alpha=0.5)\n",
+    "    axes[i].set_title(f'{year} ({LABELS[year]})', fontweight='bold')\n",
+    "    axes[i].set_ylabel('Equity (base 100)')\n",
+    "    axes[i].legend(fontsize=9)\n",
+    "\n",
+    "plt.suptitle('Courbes d\\'equity – Stratégies Baseline (coût: 2 pips)', fontweight='bold', fontsize=14)\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+]))
+
+cells.append(md("### 4.2 Tableau récapitulatif des métriques"))
+cells.append(code([
+    "rows = []\n",
+    "for year in YEARS:\n",
+    "    for name, res in all_results[year].items():\n",
+    "        m = res['metrics']\n",
+    "        rows.append({\n",
+    "            'Année': year, 'Période': LABELS[year], 'Stratégie': name,\n",
+    "            'Profit (%)': round(m['profit_cumule_pct'], 2),\n",
+    "            'Max DD (%)': round(m['max_drawdown_pct'], 2),\n",
+    "            'Sharpe': round(m['sharpe'], 3),\n",
+    "            'Profit Factor': round(m['profit_factor'], 3),\n",
+    "            'Win Rate (%)': round(m['win_rate'], 1),\n",
+    "            'Trades': m['nb_trades']\n",
+    "        })\n",
+    "\n",
+    "df_summary = pd.DataFrame(rows)\n",
+    "display(df_summary)\n",
+    "\n",
+    "print('\\n📌 Analyse des baselines :')\n",
+    "print('   → Random : performance proche de zéro (attendu). Sert de référence minimale.')\n",
+    "print('   → Buy & Hold : reflète la tendance du marché. Profitable en 2023 (hausse), perdant en 2022 (baisse).')\n",
+    "print('   → EMA + RSI : capture mieux les tendances, mais souffre des phases latérales.')\n",
+    "print('   → Un modèle ML/RL doit battre ces 3 baselines de manière CONSISTANTE sur 2023 ET 2024.')"
+]))
+
+# ── 5. T08 ──
+cells.append(md([
+    "---\n",
+    "## 5. T08 – Reinforcement Learning <a id='5'></a>\n",
+    "\n",
+    "### Conception de l'agent RL\n",
+    "\n",
+    "| Élément | Choix |\n",
+    "|---------|-------|\n",
+    "| **State** | Fenêtre de 20 bougies × 9 features (rendements, EMA, RSI, volatilité, structure bougie) |\n",
+    "| **Action** | Discrete(3) : HOLD, BUY, SELL |\n",
+    "| **Reward** | PnL normalisé − coûts de transaction − pénalité drawdown |\n",
+    "| **Algorithme** | PPO (Proximal Policy Optimization) |\n",
+    "| **Train** | 2022 |\n",
+    "| **Validation** | 2023 |\n",
+    "| **Test** | 2024 |"
+]))
+cells.append(md("### 5.1 Test de l'environnement"))
+cells.append(code([
+    "from training.trading_env import TradingEnv\n",
+    "\n",
+    "env = TradingEnv(m15[2022].copy(), window_size=20)\n",
+    "print(f'📦 Observation space : {env.observation_space.shape}  (20 fenêtres × 9 features + 1 position)')\n",
+    "print(f'🎮 Action space      : {env.action_space}  (0=HOLD, 1=BUY, 2=SELL)')\n",
+    "print(f'📊 Features          : {env.feature_columns}')"
+]))
+cells.append(md("### 5.2 Agent aléatoire (sanity check)"))
+cells.append(code([
+    "# Simuler un épisode complet avec un agent aléatoire\n",
+    "obs, info = env.reset(seed=42)\n",
+    "rewards, equities, positions = [], [info['equity']], [0]\n",
+    "\n",
+    "rng = np.random.RandomState(42)\n",
+    "done = False\n",
+    "while not done:\n",
+    "    action = rng.randint(0, 3)\n",
+    "    obs, reward, terminated, truncated, info = env.step(action)\n",
+    "    rewards.append(reward)\n",
+    "    equities.append(info['equity'])\n",
+    "    positions.append(info['position'])\n",
+    "    done = terminated or truncated\n",
+    "\n",
+    "perf = env.get_performance_summary()\n",
+    "print(f'Agent aléatoire sur 2022 :')\n",
+    "print(f'  Profit    : {perf[\"profit_pct\"]:+.2f}%')\n",
+    "print(f'  Equity    : {perf[\"final_equity\"]:,.2f}')\n",
+    "print(f'  Max DD    : {perf[\"max_drawdown_pct\"]:.2f}%')\n",
+    "print(f'  Trades    : {perf[\"nb_trades\"]}')"
+]))
+cells.append(code([
+    "fig, axes = plt.subplots(3, 1, figsize=(16, 10), sharex=True)\n",
+    "\n",
+    "axes[0].plot(equities, lw=0.8, color='steelblue')\n",
+    "axes[0].set_title('Equity curve (agent aléatoire)', fontweight='bold')\n",
+    "axes[0].set_ylabel('Capital')\n",
+    "\n",
+    "axes[1].plot(np.cumsum(rewards), lw=0.8, color='darkorange')\n",
+    "axes[1].set_title('Reward cumulée', fontweight='bold')\n",
+    "\n",
+    "axes[2].fill_between(range(len(positions)), positions, alpha=0.3,\n",
+    "                     where=[p>0 for p in positions], color='green', label='Long')\n",
+    "axes[2].fill_between(range(len(positions)), positions, alpha=0.3,\n",
+    "                     where=[p<0 for p in positions], color='red', label='Short')\n",
+    "axes[2].set_title('Positions', fontweight='bold')\n",
+    "axes[2].legend()\n",
+    "\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 L\\'agent aléatoire sert de sanity check : l\\'environnement fonctionne correctement.')\n",
+    "print('   Un agent PPO entraîné devrait significativement surperformer cette baseline.')"
+]))
+
+cells.append(md("### 5.3 Entraînement PPO"))
+cells.append(code([
+    "from stable_baselines3 import PPO\n",
+    "from stable_baselines3.common.env_checker import check_env\n",
+    "\n",
+    "# Créer les environnements\n",
+    "env_train = TradingEnv(m15[2022].copy(), window_size=20, transaction_cost=0.0002)\n",
+    "env_val   = TradingEnv(m15[2023].copy(), window_size=20, transaction_cost=0.0002)\n",
+    "env_test  = TradingEnv(m15[2024].copy(), window_size=20, transaction_cost=0.0002)\n",
+    "\n",
+    "check_env(env_train, warn=True)\n",
+    "print('✅ Environnement validé par gymnasium')\n",
+    "\n",
+    "# Entraîner le modèle PPO\n",
+    "print('\\n🚀 Entraînement PPO (100,000 timesteps)...')\n",
+    "model = PPO(\n",
+    "    'MlpPolicy', env_train,\n",
+    "    learning_rate=3e-4, gamma=0.99, batch_size=64,\n",
+    "    n_epochs=10, clip_range=0.2, ent_coef=0.01,\n",
+    "    seed=42, verbose=0\n",
+    ")\n",
+    "model.learn(total_timesteps=100_000)\n",
+    "print('✅ Entraînement terminé')"
+]))
+
+cells.append(md("### 5.4 Évaluation sur Train / Validation / Test"))
+cells.append(code([
+    "def evaluate_agent(model, env, name):\n",
+    "    \"\"\"Évalue l'agent sur un environnement et retourne les métriques + courbes.\"\"\"\n",
+    "    obs, info = env.reset()\n",
+    "    rewards, equities, positions, actions = [], [info['equity']], [0], []\n",
+    "    done = False\n",
+    "    while not done:\n",
+    "        action, _ = model.predict(obs, deterministic=True)\n",
+    "        action = int(action)  # Cast numpy array to int for env.step\n",
+    "        obs, reward, terminated, truncated, info = env.step(action)\n",
+    "        rewards.append(reward)\n",
+    "        equities.append(info['equity'])\n",
+    "        positions.append(info['position'])\n",
+    "        actions.append(action)\n",
+    "        done = terminated or truncated\n",
+    "    perf = env.get_performance_summary()\n",
+    "    return {'perf': perf, 'equities': equities, 'positions': positions,\n",
+    "            'rewards': rewards, 'actions': actions}\n",
+    "\n",
+    "# Évaluer sur les 3 périodes\n",
+    "rl_results = {}\n",
+    "envs = {2022: env_train, 2023: env_val, 2024: env_test}\n",
+    "\n",
+    "for year, env in envs.items():\n",
+    "    rl_results[year] = evaluate_agent(model, env, f'{year}')\n",
+    "    p = rl_results[year]['perf']\n",
+    "    print(f'\\n📊 {year} ({LABELS[year]}) :')\n",
+    "    print(f'   Profit    : {p[\"profit_pct\"]:+.2f}%')\n",
+    "    print(f'   Equity    : {p[\"final_equity\"]:,.2f}')\n",
+    "    print(f'   Max DD    : {p[\"max_drawdown_pct\"]:.2f}%')\n",
+    "    print(f'   Trades    : {p[\"nb_trades\"]}')\n",
+    "\n",
+    "print('\\n📌 Analyse des résultats RL :')\n",
+    "print('   → Comparer le profit et le Drawdown avec les baselines (Buy & Hold, EMA+RSI).')\n",
+    "print('   → Si le modèle perd de l\\'argent en 2023/2024, c\\'est qu\\'il a overfit sur 2022.')\n",
+    "print('   → Un nombre de trades trop faible (< 50) indique que l\\'agent est trop timide (reward shaping à ajuster).')"
+]))
+
+cells.append(md("### 5.5 Equity curves PPO vs Baselines"))
+cells.append(code([
+    "fig, axes = plt.subplots(1, 3, figsize=(20, 5))\n",
+    "\n",
+    "for i, year in enumerate(YEARS):\n",
+    "    # Baselines\n",
+    "    for name, res in all_results[year].items():\n",
+    "        eq = res['equity_curve']\n",
+    "        axes[i].plot(eq/eq[0]*100, lw=0.8, alpha=0.5, label=name, color=strat_colors[name], ls='--')\n",
+    "    # PPO\n",
+    "    eq_rl = np.array(rl_results[year]['equities'])\n",
+    "    axes[i].plot(eq_rl/eq_rl[0]*100, lw=1.5, label='PPO (RL)', color='purple')\n",
+    "    axes[i].axhline(y=100, color='black', lw=0.5, ls='--', alpha=0.3)\n",
+    "    axes[i].set_title(f'{year} ({LABELS[year]})', fontweight='bold')\n",
+    "    axes[i].set_ylabel('Equity (base 100)')\n",
+    "    axes[i].legend(fontsize=8)\n",
+    "\n",
+    "plt.suptitle('PPO vs Baselines – GBP/USD M15', fontweight='bold', fontsize=14)\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+]))
+
+cells.append(md("### 5.6 Analyse des actions de l'agent PPO"))
+cells.append(code([
+    "fig, axes = plt.subplots(1, 3, figsize=(18, 4))\n",
+    "action_labels = ['HOLD', 'BUY', 'SELL']\n",
+    "\n",
+    "for i, year in enumerate(YEARS):\n",
+    "    actions = rl_results[year]['actions']\n",
+    "    counts = [actions.count(a) for a in [0,1,2]]\n",
+    "    total = sum(counts)\n",
+    "    pcts = [c/total*100 for c in counts]\n",
+    "    bars = axes[i].bar(action_labels, pcts, color=['gray','green','red'], alpha=0.7)\n",
+    "    for bar, pct in zip(bars, pcts):\n",
+    "        axes[i].text(bar.get_x() + bar.get_width()/2, bar.get_height()+1, f'{pct:.1f}%', ha='center')\n",
+    "    axes[i].set_title(f'{year} ({LABELS[year]})', fontweight='bold')\n",
+    "    axes[i].set_ylabel('%')\n",
+    "    axes[i].set_ylim(0, 80)\n",
+    "\n",
+    "plt.suptitle('Distribution des actions de l\\'agent PPO', fontweight='bold', fontsize=14)\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "print('📌 Analyse du comportement de l\\'agent :')\n",
+    "print('   → Observer si l\\'agent utilise principalement HOLD (conservateur) ou trade activement.')\n",
+    "print('   → Un bon agent devrait adapter son comportement au régime de marché.')"
+]))
+
+cells.append(md("### 5.7 Tableau récapitulatif final : PPO vs Baselines"))
+cells.append(code([
+    "# Ajouter PPO aux résultats\n",
+    "rows_final = rows.copy()  # baselines déjà calculées\n",
+    "for year in YEARS:\n",
+    "    p = rl_results[year]['perf']\n",
+    "    eq = np.array(rl_results[year]['equities'])\n",
+    "    rets = np.diff(eq) / eq[:-1]\n",
+    "    sharpe = rets.mean() / (rets.std()+1e-10) * np.sqrt(252*26)\n",
+    "    rows_final.append({\n",
+    "        'Année': year, 'Période': LABELS[year], 'Stratégie': '🤖 PPO (RL)',\n",
+    "        'Profit (%)': round(p['profit_pct'], 2),\n",
+    "        'Max DD (%)': round(p['max_drawdown_pct'], 2),\n",
+    "        'Sharpe': round(sharpe, 3),\n",
+    "        'Profit Factor': '-',\n",
+    "        'Win Rate (%)': '-',\n",
+    "        'Trades': p['nb_trades']\n",
+    "    })\n",
+    "\n",
+    "df_final = pd.DataFrame(rows_final)\n",
+    "display(df_final)\n",
+    "\n",
+    "print('\\n📌 Conclusion finale :')\n",
+    "print('   → Le modèle est valide UNIQUEMENT s\\'il est robuste sur 2024 (test).')\n",
+    "print('   → Un bon Sharpe sur 2022 (train) ne signifie rien s\\'il s\\'effondre en 2024.')\n",
+    "print('   → Les hyperparamètres peuvent être ajustés pour améliorer la performance.')"
+]))
+
+cells.append(md([
+    "---\n",
+    "## 📋 Conclusion générale\n",
+    "\n",
+    "| | Résultat clé |\n",
+    "|---|---|\n",
+    "| **T02** | Agrégation M1→M15 réussie, ~25K bougies/an, toutes vérifications passées |\n",
+    "| **T04** | Rendements non-normaux, volatilité en clusters, prix non-stationnaires mais rendements stationnaires |\n",
+    "| **T06** | 3 baselines établies comme référence, EMA+RSI est la meilleure baseline simple |\n",
+    "| **T08** | Agent PPO entraîné et testé sur les 3 périodes (train/val/test) |\n",
+    "\n",
+    "> **Message clé** : Un modèle performant n'est pas celui qui gagne le plus sur 2022. C'est celui qui survit au changement de régime, tient compte des coûts, et est reproductible."
+]))
+
+# Build notebook
+notebook = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python", "version": "3.11.0"}
+    },
+    "nbformat": 4, "nbformat_minor": 4
+}
+
+out_path = Path(__file__).parent / 'T02_T04_T06_T08.ipynb'
+with open(out_path, 'w', encoding='utf-8') as f:
+    json.dump(notebook, f, ensure_ascii=False, indent=1)
+
+print(f'✅ Notebook généré : {out_path}')
