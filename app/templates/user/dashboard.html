@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Utilisateur{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏠 Dashboard — GBP/USD Trading</h2>
+    <p>Visualisez les données de marché et accédez aux modèles de prédiction mis à disposition.</p>
+</div>
+
+<!-- Stats -->
+{% if summary and summary is mapping and 'error' not in summary %}
+<div class="grid-3 mb-3">
+    {% for year in ['2022', '2023', '2024'] %}
+    {% if year in summary %}
+    {% set info = summary[year] %}
+    <div class="stat-card">
+        <div class="stat-label">{{ year }} — Données M15</div>
+        <div class="stat-value">{{ info['nb_rows'] }}</div>
+        <div class="stat-change">Close moy : {{ info['close_mean'] }}</div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Graphique prix -->
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">📈</span> Évolution GBP/USD — 2024</div>
+    {% if timeseries and timeseries is mapping and 'dates' in timeseries %}
+    <canvas id="priceChart" height="80"></canvas>
+    {% else %}
+    <p class="text-muted">Données non disponibles. Vérifiez que l'API FastAPI est démarrée.</p>
+    {% endif %}
+</div>
+
+<!-- Modèles publiés -->
+<div class="card">
+    <div class="card-title"><span class="icon">🤖</span> Modèles Disponibles</div>
+
+    {% if published and published is iterable and published is not mapping and published|length > 0 %}
+    <div class="grid-auto">
+        {% for p in published %}
+        <div class="card" style="background: var(--bg-secondary);">
+            <div class="flex-between mb-2">
+                <span class="badge badge-green" style="font-size: 14px;">{{ p['version'] }}</span>
+                <span class="text-muted" style="font-size: 12px;">Publié</span>
+            </div>
+            <h3 style="font-size: 15px; margin-bottom: 8px;">{{ p['model_name'] }}</h3>
+            <p class="text-muted" style="font-size: 13px; margin-bottom: 12px;">
+                Modèle de prédiction directionnelle GBP/USD.
+            </p>
+            <div class="btn-group">
+                <a href="{{ url_for('user_predict', model_name=p['model_name'], version=p['version']) }}"
+                    class="btn btn-primary btn-sm">
+                    🔮 Prédire
+                </a>
+                <a href="{{ url_for('user_predict', model_name=p['model_name'], version=p['version'], granularity='1W') }}"
+                    class="btn btn-outline btn-sm">
+                    📅 Par semaine
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="assessment-box neutral">
+        <strong>Aucun modèle publié.</strong><br>
+        Le programmeur doit d'abord entraîner et publier un modèle depuis l'<a
+            href="{{ url_for('programmer_dashboard') }}">interface Programmeur</a>.
+    </div>
+    {% endif %}
+</div>
+
+{% if timeseries and timeseries is mapping and 'dates' in timeseries %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+    const dates = {{ timeseries['dates'] | tojson }};
+    const values = {{ timeseries['values'] | tojson }};
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'GBP/USD Close (Daily)',
+                data: values,
+                borderColor: '#C4956A',
+                backgroundColor: 'rgba(196,149,106,0.08)',
+                borderWidth: 1.5,
+                fill: true,
+                pointRadius: 0,
+                tension: 0.3,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { maxTicksLimit: 12, font: { size: 11 }, color: '#9E9893' } },
+                y: { ticks: { font: { family: 'JetBrains Mono', size: 11 }, color: '#9E9893' } }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

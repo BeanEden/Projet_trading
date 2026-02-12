@@ -1,0 +1,21 @@
+{
+    "version": "v3",
+    "timestamp": "2026-02-12T10:37:05.416558",
+    "author": "JCLoirat",
+    "algorithm": "LogisticRegression",
+    "features": [
+        "rsi_14",
+        "ema_diff",
+        "atr_14"
+    ],
+    "params": {
+        "C": 1.0,
+        "max_iter": 1000,
+        "random_state": 42
+    },
+    "metrics": {
+        "accuracy": 0.5125,
+        "f1_score": 0.3559,
+        "roc_auc": 0.5181
+    }
+}

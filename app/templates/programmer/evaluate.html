@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Évaluation — {{ model_name }} {{ version }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="{{ url_for('programmer_dashboard') }}">Programmeur</a>
+    <span class="sep">/</span>
+    <a href="{{ url_for('programmer_model_detail', model_name=model_name) }}">{{ model_name }}</a>
+    <span class="sep">/</span>
+    <span>{{ version }}</span>
+</div>
+
+<div class="page-header">
+    <h2>📊 Évaluation — {{ model_name }} <span class="badge badge-blue">{{ version }}</span></h2>
+    <p>Évaluation complète sur le jeu de test 2024 (données jamais vues par le modèle).</p>
+</div>
+
+{% if evaluation and 'error' not in evaluation %}
+
+<!-- Assessment -->
+<div
+    class="assessment-box {% if evaluation.accuracy > 0.55 %}positive{% elif evaluation.accuracy > 0.51 %}neutral{% else %}negative{% endif %}">
+    <strong>Verdict :</strong> {{ evaluation.assessment }}
+    <br>
+    <small class="text-muted">
+        ℹ️ En trading binaire, une accuracy de 50% = hasard pur. Au-dessus de 52%, le modèle commence à être
+        exploitable.
+        Au-dessus de 55%, il peut générer un alpha net de frais. Au-dessous de 50%, il vaut mieux inverser les signaux.
+    </small>
+</div>
+
+<!-- Métriques clefs -->
+<div class="grid-4 mb-3 mt-2">
+    <div class="stat-card">
+        <div class="stat-label">Accuracy</div>
+        <div class="stat-value {% if evaluation.accuracy > 0.52 %}text-green{% else %}text-red{% endif %}">
+            {{ "%.2f"|format(evaluation.accuracy * 100) }}%
+        </div>
+        <div class="stat-change">Seuil utile : > 52%</div>
+    </div>
+    {% if evaluation.roc_auc is defined %}
+    <div class="stat-card">
+        <div class="stat-label">ROC AUC</div>
+        <div class="stat-value {% if evaluation.roc_auc > 0.55 %}text-green{% else %}text-red{% endif %}">
+            {{ "%.4f"|format(evaluation.roc_auc) }}
+        </div>
+        <div class="stat-change">0.5 = hasard, 1.0 = parfait</div>
+    </div>
+    {% endif %}
+    {% if evaluation.classification_report %}
+    {% set cr = evaluation.classification_report %}
+    <div class="stat-card">
+        <div class="stat-label">Precision (macro)</div>
+        <div class="stat-value text-mono">{{ "%.2f"|format(cr['macro avg']['precision'] * 100) }}%</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Recall (macro)</div>
+        <div class="stat-value text-mono">{{ "%.2f"|format(cr['macro avg']['recall'] * 100) }}%</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Classification Report (détaillé) -->
+{% if evaluation.classification_report %}
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">📋</span> Classification Report</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Classe</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>F1-Score</th>
+                    <th>Support</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cls_key in ['0', '1'] %}
+                {% if cls_key in evaluation.classification_report %}
+                {% set cls = evaluation.classification_report[cls_key] %}
+                <tr>
+                    <td><span class="badge {% if cls_key == '1' %}badge-green{% else %}badge-red{% endif %}">
+                            {{ 'Hausse' if cls_key == '1' else 'Baisse' }}
+                        </span></td>
+                    <td class="mono">{{ "%.4f"|format(cls.precision) }}</td>
+                    <td class="mono">{{ "%.4f"|format(cls.recall) }}</td>
+                    <td class="mono">{{ "%.4f"|format(cls['f1-score']) }}</td>
+                    <td class="mono">{{ cls.support|int }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+                {% if 'macro avg' in evaluation.classification_report %}
+                {% set macro = evaluation.classification_report['macro avg'] %}
+                <tr style="font-weight: 600; border-top: 2px solid var(--border-medium);">
+                    <td>Macro avg</td>
+                    <td class="mono">{{ "%.4f"|format(macro.precision) }}</td>
+                    <td class="mono">{{ "%.4f"|format(macro.recall) }}</td>
+                    <td class="mono">{{ "%.4f"|format(macro['f1-score']) }}</td>
+                    <td class="mono">{{ macro.support|int }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-2 text-muted" style="font-size: 13px;">
+        ⚠️ <strong>Interprétation :</strong> Un déséquilibre precision/recall indique que le modèle favorise une classe.
+        Si le recall Hausse est élevé mais la precision basse, le modèle prédit trop souvent "Hausse" (faux positifs
+        fréquents).
+    </div>
+</div>
+{% endif %}
+
+<!-- Graphiques -->
+<div class="grid-2 mb-3">
+    <!-- Matrice de Confusion -->
+    <div class="card">
+        <div class="card-title"><span class="icon">🔲</span> Matrice de Confusion</div>
+        {% if confusion and confusion.image %}
+        <div class="chart-container">
+            <img src="{{ confusion.image }}" alt="Confusion Matrix">
+        </div>
+        <div class="text-muted mt-1" style="font-size: 12px;">
+            Diagonale = prédictions correctes. Plus les valeurs extra-diagonales sont élevées, plus le modèle se trompe.
+        </div>
+        {% else %}
+        <p class="text-muted">Graphique non disponible.</p>
+        {% endif %}
+    </div>
+
+    <!-- Courbe ROC -->
+    <div class="card">
+        <div class="card-title"><span class="icon">📉</span> Courbe ROC-AUC</div>
+        {% if roc and roc.image %}
+        <div class="chart-container">
+            <img src="{{ roc.image }}" alt="ROC Curve">
+        </div>
+        <div class="text-muted mt-1" style="font-size: 12px;">
+            Plus la courbe se rapproche du coin supérieur gauche, meilleur est le modèle. AUC = 0.5 → aléatoire.
+        </div>
+        {% else %}
+        <p class="text-muted">{{ roc.error if roc and roc.error else 'Graphique non disponible.' }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Feature Importance -->
+{% if importance and importance.image %}
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">🏋️</span> Feature Importance</div>
+    <div class="chart-container">
+        <img src="{{ importance.image }}" alt="Feature Importance">
+    </div>
+    <div class="text-muted mt-1" style="font-size: 12px;">
+        Les features les plus importantes sont celles qui contribuent le plus aux décisions de l'arbre.
+        Une feature dominante peut indiquer un overfit si elle est bruitée.
+    </div>
+</div>
+{% endif %}
+
+<!-- Métadonnées du modèle -->
+{% if evaluation.meta %}
+<div class="card">
+    <div class="card-title"><span class="icon">⚙️</span> Métadonnées</div>
+    <div class="grid-3">
+        <div>
+            <div class="stat-label">Algorithme</div>
+            <div style="font-weight:600; margin-top:4px;">{{ evaluation.meta.get('algorithm', 'N/A') }}</div>
+        </div>
+        <div>
+            <div class="stat-label">Auteur</div>
+            <div style="font-weight:600; margin-top:4px;">{{ evaluation.meta.get('author', 'N/A') }}</div>
+        </div>
+        <div>
+            <div class="stat-label">Date</div>
+            <div style="font-weight:600; margin-top:4px;">{{ evaluation.meta.get('timestamp', 'N/A')[:19] }}</div>
+        </div>
+    </div>
+    {% if evaluation.meta.params %}
+    <div class="mt-2">
+        <div class="stat-label mb-1">Hyperparamètres</div>
+        <div class="checkbox-group">
+            {% for k, v in evaluation.meta.params.items() %}
+            <span class="badge badge-muted">{{ k }} = {{ v }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% if evaluation.meta.features %}
+    <div class="mt-2">
+        <div class="stat-label mb-1">Features utilisées</div>
+        <div class="checkbox-group">
+            {% for feat in evaluation.meta.features %}
+            <span class="badge badge-gold">{{ feat }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="alert alert-danger">
+    {{ evaluation.error if evaluation and evaluation.error else "Erreur lors de l'évaluation du modèle." }}
+</div>
+{% endif %}
+{% endblock %}

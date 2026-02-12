@@ -1,0 +1,174 @@
+{
+    "models": {
+        "rf_direction_classifier": [
+            {
+                "version": "v1",
+                "timestamp": "2026-02-11T16:48:58.825398",
+                "author": "JCLoirat",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20",
+                    "ema_50",
+                    "atr_14",
+                    "adx_14"
+                ],
+                "params": {
+                    "n_estimators": 50,
+                    "max_depth": 3,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5134397817539919,
+                    "f1_score": 0.3425845620121422
+                }
+            },
+            {
+                "version": "v2",
+                "timestamp": "2026-02-11T16:49:06.967073",
+                "author": "JCLoirat",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20",
+                    "ema_50",
+                    "atr_14",
+                    "adx_14"
+                ],
+                "params": {
+                    "n_estimators": 200,
+                    "max_depth": 10,
+                    "min_samples_leaf": 5,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5101500441306267,
+                    "f1_score": 0.32985729967069155
+                }
+            },
+            {
+                "version": "v3",
+                "timestamp": "2026-02-12T10:37:05.416558",
+                "author": "JCLoirat",
+                "algorithm": "LogisticRegression",
+                "features": [
+                    "rsi_14",
+                    "ema_diff",
+                    "atr_14"
+                ],
+                "params": {
+                    "C": 1.0,
+                    "max_iter": 1000,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5125,
+                    "f1_score": 0.3559,
+                    "roc_auc": 0.5181
+                }
+            },
+            {
+                "version": "v4",
+                "timestamp": "2026-02-12T10:59:18.884942",
+                "author": "Test",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20",
+                    "ema_50"
+                ],
+                "params": {
+                    "n_estimators": 50,
+                    "max_depth": 3,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5106,
+                    "f1_score": 0.2362,
+                    "roc_auc": 0.5183
+                }
+            },
+            {
+                "version": "v5",
+                "timestamp": "2026-02-12T10:59:54.741495",
+                "author": "JCLoirat",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20",
+                    "ema_50",
+                    "atr_14",
+                    "adx_14"
+                ],
+                "params": {
+                    "n_estimators": 100,
+                    "max_depth": 5,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5117,
+                    "f1_score": 0.3738,
+                    "roc_auc": 0.5164
+                }
+            },
+            {
+                "version": "v6",
+                "timestamp": "2026-02-12T11:01:08.251511",
+                "author": "JCLoirat",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20"
+                ],
+                "params": {
+                    "n_estimators": 100,
+                    "max_depth": 5,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5108,
+                    "f1_score": 0.33,
+                    "roc_auc": 0.5165
+                }
+            },
+            {
+                "version": "v7",
+                "timestamp": "2026-02-12T11:10:29.535801",
+                "author": "TestFlask",
+                "algorithm": "RandomForest",
+                "features": [
+                    "rsi_14",
+                    "ema_20",
+                    "ema_50"
+                ],
+                "params": {
+                    "n_estimators": 50,
+                    "max_depth": 3,
+                    "random_state": 42
+                },
+                "metrics": {
+                    "accuracy": 0.5106,
+                    "f1_score": 0.2362,
+                    "roc_auc": 0.5183
+                }
+            }
+        ]
+    },
+    "published": [
+        {
+            "model_name": "rf_direction_classifier",
+            "version": "v1",
+            "published_at": "2026-02-12T10:38:53.123310"
+        },
+        {
+            "model_name": "rf_direction_classifier",
+            "version": "v3",
+            "published_at": "2026-02-12T10:38:55.179245"
+        },
+        {
+            "model_name": "rf_direction_classifier",
+            "version": "v7",
+            "published_at": "2026-02-12T11:19:25.899914"
+        }
+    ]
+}

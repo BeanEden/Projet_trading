@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Features & Analyse{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🔬 Features & Analyse Statistique</h2>
+    <p>Explorez les features, leur pouvoir prédictif (ANOVA) et le clustering des données 2024.</p>
+</div>
+
+<!-- Features disponibles -->
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">📋</span> Features Disponibles</div>
+    <div class="checkbox-group">
+        {% for col in columns %}
+        <span class="badge badge-gold" style="font-size: 13px; padding: 6px 14px;">{{ col }}</span>
+        {% endfor %}
+    </div>
+    <div class="text-muted mt-2" style="font-size: 13px;">
+        Ces features sont calculées dans <code>run_features_T05.py</code>.
+        Elles sont issues des données M15 GBP/USD et incluent des indicateurs techniques (RSI, EMA, ATR, ADX).
+    </div>
+</div>
+
+<div class="grid-2 mb-3">
+    <!-- ANOVA -->
+    <div class="card">
+        <div class="card-title"><span class="icon">📊</span> ANOVA (Feature vs Target)</div>
+        <form method="GET" class="flex gap-2 mb-2" style="align-items: end;">
+            <div class="form-group" style="flex:1; margin-bottom:0;">
+                <label for="feature">Feature à tester</label>
+                <select name="feature" id="feature" class="form-control">
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col==anova_feat %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-outline btn-sm">Analyser</button>
+        </form>
+
+        {% if anova and anova.image %}
+        <div class="chart-container">
+            <img src="{{ anova.image }}" alt="ANOVA">
+        </div>
+        <div class="grid-3 mt-2">
+            <div class="stat-card">
+                <div class="stat-label">F-Statistic</div>
+                <div class="stat-value text-mono" style="font-size: 18px;">{{ anova.f_statistic }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">P-Value</div>
+                <div class="stat-value text-mono {% if anova.p_value < 0.05 %}text-green{% else %}text-red{% endif %}"
+                    style="font-size: 18px;">
+                    {{ anova.p_value }}
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Verdict</div>
+                <div style="margin-top:4px; font-weight:600;">{{ anova.assessment }}</div>
+            </div>
+        </div>
+        <div class="text-muted mt-2" style="font-size: 12px;">
+            <strong>Interprétation :</strong> Si p < 0.05, la feature est statistiquement significative pour distinguer
+                Hausse vs Baisse. Un F élevé indique une forte discrimination. Privilégiez les features significatives
+                dans vos modèles. </div>
+                {% elif anova and anova.error is defined %}
+                <div class="alert alert-danger">{{ anova.error }}</div>
+                {% endif %}
+        </div>
+
+        <!-- Clustering -->
+        <div class="card">
+            <div class="card-title"><span class="icon">🎯</span> Clustering (KMeans + PCA)</div>
+            {% if clusters and clusters.image %}
+            <div class="chart-container">
+                <img src="{{ clusters.image }}" alt="Clusters">
+            </div>
+            <div class="stat-card mt-2">
+                <div class="stat-label">Silhouette Score</div>
+                <div class="stat-value text-mono {% if clusters.silhouette > 0.3 %}text-green{% else %}text-red{% endif %}"
+                    style="font-size: 20px;">
+                    {{ clusters.silhouette }}
+                </div>
+                <div class="stat-change text-muted">
+                    {% if clusters.silhouette > 0.5 %}Structure forte{% elif clusters.silhouette > 0.3 %}Structure
+                    modérée{% else %}Pas de structure claire{% endif %}
+                </div>
+            </div>
+            <div class="text-muted mt-2" style="font-size: 12px;">
+                <strong>Silhouette :</strong> Mesure la cohérence des clusters.
+                > 0.5 = clusters bien définis, 0.25-0.5 = structure faible, < 0.25=pas de clustering naturel. En
+                    trading, un faible score est normal (marché=bruit). </div>
+                    {% elif clusters and clusters.error is defined %}
+                    <div class="alert alert-danger">{{ clusters.error }}</div>
+                    {% endif %}
+            </div>
+        </div>
+        {% endblock %}

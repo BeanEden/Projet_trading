@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ model_name }} — Détails{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="{{ url_for('programmer_dashboard') }}">Programmeur</a>
+    <span class="sep">/</span>
+    <span>{{ model_name }}</span>
+</div>
+
+<div class="page-header flex-between">
+    <div>
+        <h2>📦 {{ model_name }}</h2>
+        <p>{{ history|length if history is iterable and history is not mapping else 0 }} version(s) enregistrée(s)</p>
+    </div>
+    <a href="{{ url_for('programmer_train') }}" class="btn btn-primary">+ Nouvelle Version</a>
+</div>
+
+{% if history and history is iterable and history is not mapping %}
+<div class="card">
+    <div class="card-title"><span class="icon">🕐</span> Historique des Versions</div>
+
+    <div class="timeline">
+        {% for v in history|reverse %}
+        <div class="timeline-item fade-in" style="animation-delay: {{ loop.index * 0.1 }}s;">
+            <div class="flex-between">
+                <div>
+                    <span class="badge badge-blue" style="font-size: 14px;">{{ v.version }}</span>
+                    <span class="text-muted" style="margin-left: 8px; font-size: 13px;">{{ v.timestamp[:19] if
+                        v.timestamp else '' }}</span>
+                    {% if v.author %}<span class="badge badge-muted" style="margin-left: 8px;">{{ v.author }}</span>{%
+                    endif %}
+                </div>
+                <div class="btn-group">
+                    <a href="{{ url_for('programmer_evaluate', model_name=model_name, version=v.version) }}"
+                        class="btn btn-outline btn-sm">📊 Évaluer</a>
+                    <form method="post" action="{{ url_for('programmer_publish') }}" style="display:inline;">
+                        <input type="hidden" name="model_name" value="{{ model_name }}">
+                        <input type="hidden" name="version" value="{{ v.version }}">
+                        <button type="submit" class="btn btn-success btn-sm">🚀 Publier</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Métriques inline -->
+            <div class="grid-4 mt-1" style="margin-left: 0;">
+                {% if v.metrics %}
+                <div>
+                    <span class="text-muted" style="font-size: 11px;">Accuracy</span>
+                    <div class="text-mono {% if v.metrics.accuracy > 0.52 %}text-green{% else %}text-red{% endif %}"
+                        style="font-weight: 600;">
+                        {{ "%.2f%%"|format(v.metrics.accuracy * 100) }}
+                    </div>
+                </div>
+                <div>
+                    <span class="text-muted" style="font-size: 11px;">F1</span>
+                    <div class="text-mono" style="font-weight: 600;">{{ "%.4f"|format(v.metrics.f1_score) }}</div>
+                </div>
+                {% if v.metrics.roc_auc is defined %}
+                <div>
+                    <span class="text-muted" style="font-size: 11px;">AUC</span>
+                    <div class="text-mono" style="font-weight: 600;">{{ "%.4f"|format(v.metrics.roc_auc) }}</div>
+                </div>
+                {% endif %}
+                {% endif %}
+                <div>
+                    <span class="text-muted" style="font-size: 11px;">Algo</span>
+                    <div style="font-weight: 500; font-size: 13px;">{{ v.algorithm if v.algorithm is defined else
+                        v.get('algorithm', '?') }}</div>
+                </div>
+            </div>
+
+            <!-- Paramètres & Features -->
+            {% if v.params %}
+            <div class="mt-1">
+                {% for k, val in v.params.items() %}
+                <span class="badge badge-muted" style="margin: 2px; font-size: 11px;">{{ k }}={{ val }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if v.features is defined and v.features %}
+            <div class="mt-1">
+                {% for feat in v.features %}
+                <span class="badge badge-gold" style="margin: 2px; font-size: 11px;">{{ feat }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning">{{ history.error if history and history.error is defined else 'Aucune version trouvée.'
+    }}</div>
+{% endif %}
+{% endblock %}

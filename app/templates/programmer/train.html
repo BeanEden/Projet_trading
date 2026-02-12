@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Entraîner un Modèle{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🧠 Entraîner un Nouveau Modèle</h2>
+    <p>Configurez l'algorithme, les hyperparamètres et les features pour créer une nouvelle version.</p>
+</div>
+
+{% if result %}
+{% if result.error is defined %}
+<div class="alert alert-danger">❌ {{ result.error }}</div>
+{% else %}
+<div class="alert alert-success">
+    ✅ Modèle entraîné avec succès ! Version <strong>{{ result.version }}</strong> créée.
+    <br>Accuracy : <strong>{{ "%.2f%%"|format(result.metrics.accuracy * 100) }}</strong>
+    | F1 : <strong>{{ "%.4f"|format(result.metrics.f1_score) }}</strong>
+    {% if result.metrics.roc_auc is defined %}| AUC : <strong>{{ "%.4f"|format(result.metrics.roc_auc) }}</strong>{%
+    endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<div class="grid-2">
+    <!-- Formulaire d'entraînement -->
+    <div class="card">
+        <div class="card-title"><span class="icon">⚙️</span> Configuration</div>
+        <form method="POST">
+            <div class="form-group">
+                <label for="model_name">Nom du Modèle</label>
+                <input type="text" id="model_name" name="model_name" class="form-control"
+                    value="rf_direction_classifier" required>
+            </div>
+
+            <div class="form-group">
+                <label for="author">Auteur</label>
+                <input type="text" id="author" name="author" class="form-control" value="JCLoirat">
+            </div>
+
+            <div class="form-group">
+                <label for="algorithm">Algorithme</label>
+                <select id="algorithm" name="algorithm" class="form-control" onchange="toggleParams()">
+                    <option value="RandomForest">🌳 Random Forest</option>
+                    <option value="GradientBoosting">🚀 Gradient Boosting</option>
+                    <option value="LogisticRegression">📏 Logistic Regression</option>
+                </select>
+            </div>
+
+            <!-- Params RF / GB -->
+            <div id="params-tree">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label for="n_estimators">Nombre d'arbres</label>
+                        <input type="number" id="n_estimators" name="n_estimators" class="form-control" value="100"
+                            min="10" max="1000">
+                    </div>
+                    <div class="form-group">
+                        <label for="max_depth">Profondeur max</label>
+                        <input type="number" id="max_depth" name="max_depth" class="form-control" value="5" min="1"
+                            max="30">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Params GB extra -->
+            <div id="params-gb" style="display:none;">
+                <div class="form-group">
+                    <label for="learning_rate">Learning Rate</label>
+                    <input type="number" id="learning_rate" name="learning_rate" class="form-control" value="0.1"
+                        min="0.001" max="1" step="0.01">
+                </div>
+            </div>
+
+            <!-- Params LR -->
+            <div id="params-lr" style="display:none;">
+                <div class="form-group">
+                    <label for="C">Régularisation C</label>
+                    <input type="number" id="C" name="C" class="form-control" value="1.0" min="0.01" max="100"
+                        step="0.1">
+                </div>
+            </div>
+
+            <!-- Features -->
+            <div class="form-group">
+                <label>Features à utiliser</label>
+                <div class="checkbox-group">
+                    {% for col in columns %}
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="features" value="{{ col }}" {% if col in ['rsi_14', 'ema_20'
+                            , 'ema_50' , 'atr_14' , 'adx_14' ] %}checked{% endif %}>
+                        {{ col }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <small class="text-muted mt-1" style="display:block;">
+                    ℹ️ Sélectionnez les features les plus pertinentes. Trop de features → risque d'overfit.
+                </small>
+            </div>
+
+            <button type="submit" id="trainBtn" class="btn btn-primary">🚀 Lancer l'entraînement</button>
+        </form>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(44,40,38,0.6); z-index:9999; display:none; align-items:center; justify-content:center;">
+            <div class="card" style="text-align:center; padding:40px 60px; max-width:420px;">
+                <div style="font-size:40px; margin-bottom:16px; animation: spin 1.5s linear infinite;">⚙️</div>
+                <h3 style="margin-bottom:8px;">Entraînement en cours…</h3>
+                <p class="text-muted" style="font-size:13px;">Chargement des données (3 années) + entraînement du
+                    modèle.<br>Cela peut prendre <strong>60 à 90 secondes</strong>.</p>
+                <div
+                    style="margin-top:16px; height:4px; background:var(--bg-secondary); border-radius:4px; overflow:hidden;">
+                    <div
+                        style="height:100%; background:linear-gradient(90deg, var(--accent-warm), var(--accent-gold)); animation: progress 3s ease-in-out infinite; width:30%; border-radius:4px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide -->
+    <div>
+        <div class="card mb-2">
+            <div class="card-title"><span class="icon">📖</span> Guide Algorithmes</div>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <strong>🌳 Random Forest</strong>
+                    <p class="text-muted" style="font-size: 13px; margin-top: 4px;">
+                        Ensemble d'arbres de décision. Robuste, peu sensible à l'overfit.
+                        <br><strong>Params clés :</strong> n_estimators (+ = + stable), max_depth (+ = + complexe).
+                    </p>
+                </div>
+                <div class="timeline-item">
+                    <strong>🚀 Gradient Boosting</strong>
+                    <p class="text-muted" style="font-size: 13px; margin-top: 4px;">
+                        Arbres séquentiels corrigeant les erreurs. Plus puissant mais plus sensible au surapprentissage.
+                        <br><strong>Params clés :</strong> learning_rate (bas = prudent), n_estimators, max_depth.
+                    </p>
+                </div>
+                <div class="timeline-item">
+                    <strong>📏 Logistic Regression</strong>
+                    <p class="text-muted" style="font-size: 13px; margin-top: 4px;">
+                        Modèle linéaire simple. Sert de baseline. Si un RF ne bat pas la LR, les features sont
+                        insuffisantes.
+                        <br><strong>Params clés :</strong> C (haut = moins de régularisation).
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span class="icon">⚠️</span> Bonnes pratiques</div>
+            <ul style="font-size: 13px; color: var(--text-secondary); padding-left: 20px; line-height: 2;">
+                <li>Commencez avec un modèle simple (LR) comme baseline</li>
+                <li>Augmentez la complexité progressivement</li>
+                <li>Si accuracy < 52%, le modèle n'est <strong>pas exploitable</strong></li>
+                <li>Comparez toujours avec la version précédente</li>
+                <li>Ne publiez que les modèles validés sur le test set</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes progress {
+        0% {
+            margin-left: 0;
+            width: 30%;
+        }
+
+        50% {
+            margin-left: 40%;
+            width: 50%;
+        }
+
+        100% {
+            margin-left: 0;
+            width: 30%;
+        }
+    }
+</style>
+<script>
+    function toggleParams() {
+        const algo = document.getElementById('algorithm').value;
+        document.getElementById('params-tree').style.display = ['RandomForest', 'GradientBoosting'].includes(algo) ? '' : 'none';
+        document.getElementById('params-gb').style.display = algo === 'GradientBoosting' ? '' : 'none';
+        document.getElementById('params-lr').style.display = algo === 'LogisticRegression' ? '' : 'none';
+    }
+
+    // Form submit: validate features + show loading
+    document.querySelector('form').addEventListener('submit', function (e) {
+        const checked = document.querySelectorAll('input[name="features"]:checked');
+        if (checked.length === 0) {
+            e.preventDefault();
+            alert('⚠️ Veuillez sélectionner au moins une feature.');
+            return;
+        }
+        // Show loading overlay
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.style.display = 'flex';
+        // Disable button
+        const btn = document.getElementById('trainBtn');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Entraînement en cours…';
+        btn.style.opacity = '0.6';
+    });
+</script>
+{% endblock %}

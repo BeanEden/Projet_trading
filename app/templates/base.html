@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trading Registry{% endblock %} — Model Registry</title>
+    <meta name="description" content="Plateforme de gestion, entraînement et évaluation des modèles de trading ML GBP/USD.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="app-layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h1>
+                <span class="brand-icon">📊</span>
+                Trading ML
+            </h1>
+            <small>GBP/USD Model Registry</small>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Utilisateur</div>
+            <a href="{{ url_for('user_dashboard') }}" class="sidebar-link {% if request.path == '/user' %}active{% endif %}">
+                <span class="icon">🏠</span> Dashboard
+            </a>
+            <a href="{{ url_for('user_compare') }}" class="sidebar-link {% if request.path == '/user/compare' %}active{% endif %}">
+                <span class="icon">⚖️</span> Comparer & Prédire
+            </a>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Programmeur</div>
+            <a href="{{ url_for('programmer_dashboard') }}" class="sidebar-link {% if request.path == '/programmer' %}active{% endif %}">
+                <span class="icon">🔧</span> Dashboard
+            </a>
+            <a href="{{ url_for('programmer_train') }}" class="sidebar-link {% if '/programmer/train' in request.path %}active{% endif %}">
+                <span class="icon">🧠</span> Entraîner
+            </a>
+            <a href="{{ url_for('programmer_compare') }}" class="sidebar-link {% if '/programmer/compare' in request.path %}active{% endif %}">
+                <span class="icon">📈</span> Comparer
+            </a>
+            <a href="{{ url_for('programmer_features') }}" class="sidebar-link {% if '/programmer/features' in request.path %}active{% endif %}">
+                <span class="icon">🔬</span> Features & Analyse
+            </a>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">API</div>
+            <a href="http://localhost:8000/docs" target="_blank" class="sidebar-link">
+                <span class="icon">📝</span> FastAPI /docs
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

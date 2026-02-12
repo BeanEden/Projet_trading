@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Comparer les Modèles{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📈 Comparatif des Modèles</h2>
+    <p>Sélectionnez deux versions pour comparer métriques, paramètres et décisions.</p>
+</div>
+
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">⚖️</span> Sélection</div>
+    <form method="GET" class="grid-3" style="align-items: end;">
+        <div class="form-group">
+            <label for="sel_a">Modèle A</label>
+            <select name="sel_a" id="sel_a" class="form-control">
+                <option value="">-- Choisir --</option>
+                {% for mv in model_versions %}
+                <option value="{{ mv.name }}|{{ mv.version }}" {% if sel_a==mv.name + '|' + mv.version %}selected{%
+                    endif %}>
+                    {{ mv.name }} — {{ mv.version }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="sel_b">Modèle B</label>
+            <select name="sel_b" id="sel_b" class="form-control">
+                <option value="">-- Choisir --</option>
+                {% for mv in model_versions %}
+                <option value="{{ mv.name }}|{{ mv.version }}" {% if sel_b==mv.name + '|' + mv.version %}selected{%
+                    endif %}>
+                    {{ mv.name }} — {{ mv.version }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">🔍 Comparer</button>
+        </div>
+    </form>
+</div>
+
+{% if comparison %}
+{% if comparison.error is defined %}
+<div class="alert alert-danger">{{ comparison.error }}</div>
+{% elif comparison.comparison %}
+
+<!-- Tableau comparatif -->
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">📊</span> Résultat de la Comparaison</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Propriété</th>
+                    {% for c in comparison.comparison %}
+                    <th>{{ c.model_name }} — {{ c.version }}</th>
+                    {% endfor %}
+                    <th>Diff</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Algorithme</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td><span class="badge badge-muted">{{ c.algorithm }}</span></td>
+                    {% endfor %}
+                    <td>
+                        {% if comparison.comparison[0].algorithm != comparison.comparison[1].algorithm %}
+                        <span class="badge badge-gold">Changé</span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Accuracy</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td
+                        class="mono {% if c.accuracy > 0.52 %}text-green{% elif c.accuracy < 0.51 %}text-red{% endif %}">
+                        {{ "%.2f%%"|format(c.accuracy * 100) }}
+                    </td>
+                    {% endfor %}
+                    <td>
+                        {% set diff_acc = comparison.comparison[1].accuracy - comparison.comparison[0].accuracy %}
+                        <span class="{% if diff_acc > 0 %}text-green{% elif diff_acc < 0 %}text-red{% endif %} mono">
+                            {{ "%+.2f%%"|format(diff_acc * 100) }}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>F1 Score</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td class="mono">{{ "%.4f"|format(c.f1_score) }}</td>
+                    {% endfor %}
+                    <td>
+                        {% set diff_f1 = comparison.comparison[1].f1_score - comparison.comparison[0].f1_score %}
+                        <span class="{% if diff_f1 > 0 %}text-green{% elif diff_f1 < 0 %}text-red{% endif %} mono">
+                            {{ "%+.4f"|format(diff_f1) }}
+                        </span>
+                    </td>
+                </tr>
+                {% if comparison.comparison[0].roc_auc is defined and comparison.comparison[1].roc_auc is defined %}
+                <tr>
+                    <td><strong>ROC AUC</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td class="mono">{{ "%.4f"|format(c.roc_auc) }}</td>
+                    {% endfor %}
+                    <td>
+                        {% set diff_auc = comparison.comparison[1].roc_auc - comparison.comparison[0].roc_auc %}
+                        <span class="{% if diff_auc > 0 %}text-green{% elif diff_auc < 0 %}text-red{% endif %} mono">
+                            {{ "%+.4f"|format(diff_auc) }}
+                        </span>
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td><strong>Features</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td>
+                        {% for f in c.features %}
+                        <span class="badge badge-gold" style="margin: 2px;">{{ f }}</span>
+                        {% endfor %}
+                    </td>
+                    {% endfor %}
+                    <td>
+                        {% set f_a = comparison.comparison[0].features|sort|join(',') %}
+                        {% set f_b = comparison.comparison[1].features|sort|join(',') %}
+                        {% if f_a != f_b %}
+                        <span class="badge badge-gold">Changé</span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>Hyperparamètres</strong></td>
+                    {% for c in comparison.comparison %}
+                    <td style="font-size: 12px;">
+                        {% for k, v in c.params.items() %}
+                        <span class="badge badge-muted" style="margin: 2px;">{{ k }}={{ v }}</span>
+                        {% endfor %}
+                    </td>
+                    {% endfor %}
+                    <td>
+                        {% if comparison.comparison[0].params != comparison.comparison[1].params %}
+                        <span class="badge badge-gold">Changé</span>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Verdict -->
+<div class="card">
+    <div class="card-title"><span class="icon">🏆</span> Verdict</div>
+    {% set a = comparison.comparison[0] %}
+    {% set b = comparison.comparison[1] %}
+    {% if b.accuracy > a.accuracy %}
+    <div class="assessment-box positive">
+        <strong>{{ b.model_name }} {{ b.version }}</strong> est meilleur en accuracy (+{{ "%.2f%%"|format((b.accuracy -
+        a.accuracy) * 100) }}).
+        {% if b.f1_score > a.f1_score %}L'amélioration est confirmée par le F1 Score.{% endif %}
+    </div>
+    {% elif a.accuracy > b.accuracy %}
+    <div class="assessment-box negative">
+        <strong>{{ a.model_name }} {{ a.version }}</strong> reste meilleur. La {{ b.version }} a régressé de {{
+        "%.2f%%"|format((a.accuracy - b.accuracy) * 100) }}.
+    </div>
+    {% else %}
+    <div class="assessment-box neutral">
+        Performances identiques. Vérifiez les autres métriques (F1, AUC) pour départager.
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

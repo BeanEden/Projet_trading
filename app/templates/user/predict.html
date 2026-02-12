@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Prédiction — {{ model_name }} {{ version }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="{{ url_for('user_dashboard') }}">Utilisateur</a>
+    <span class="sep">/</span>
+    <span>Prédiction</span>
+</div>
+
+<div class="page-header">
+    <h2>🔮 Prédiction — {{ model_name }} <span class="badge badge-green">{{ version }}</span></h2>
+    <p>Résultat du modèle sur les données 2024 (test set jamais vu à l'entraînement).</p>
+</div>
+
+<!-- Granularity Tabs -->
+<div class="tab-group mb-3">
+    <a href="{{ url_for('user_predict', model_name=model_name, version=version, granularity='1D') }}"
+        class="tab-item {% if granularity == '1D' %}active{% endif %}">📆 Jour</a>
+    <a href="{{ url_for('user_predict', model_name=model_name, version=version, granularity='1W') }}"
+        class="tab-item {% if granularity == '1W' %}active{% endif %}">📅 Semaine</a>
+    <a href="{{ url_for('user_predict', model_name=model_name, version=version, granularity='1ME') }}"
+        class="tab-item {% if granularity == '1ME' %}active{% endif %}">🗓️ Mois</a>
+</div>
+
+{% if prediction and 'error' not in prediction %}
+
+<!-- Métriques résumé -->
+<div class="grid-3 mb-3">
+    <div class="stat-card">
+        <div class="stat-label">Accuracy Globale 2024</div>
+        <div class="stat-value {% if prediction.global_accuracy > 0.52 %}text-green{% else %}text-red{% endif %}">
+            {{ "%.1f"|format(prediction.global_accuracy * 100) }}%
+        </div>
+        <div class="stat-change {% if prediction.global_accuracy > 0.52 %}positive{% else %}negative{% endif %}">
+            {{ "Au-dessus du seuil de 50%" if prediction.global_accuracy > 0.5 else "En dessous du seuil de 50%" }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Périodes analysées</div>
+        <div class="stat-value">{{ prediction.nb_periods }}</div>
+        <div class="stat-change">Granularité : {{ {'1D': 'Journalière', '1W': 'Hebdomadaire', '1ME':
+            'Mensuelle'}.get(granularity, granularity) }}</div>
+    </div>
+    {% if evaluation and evaluation.roc_auc is defined %}
+    <div class="stat-card">
+        <div class="stat-label">ROC AUC</div>
+        <div class="stat-value text-mono">{{ "%.4f"|format(evaluation.roc_auc) }}</div>
+        <div class="stat-change">Qualité du classement</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Graphique principal -->
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">📊</span> Prédictions vs Réel — {{ {'1D': 'Jour', '1W': 'Semaine', '1ME':
+        'Mois'}.get(granularity, granularity) }}</div>
+    {% if prediction.image %}
+    <div class="chart-container">
+        <img src="{{ prediction.image }}" alt="Predictions Chart" style="max-width: 100%;">
+    </div>
+    {% endif %}
+
+    <div class="mt-2">
+        <div
+            class="assessment-box {% if prediction.global_accuracy > 0.55 %}positive{% elif prediction.global_accuracy > 0.51 %}neutral{% else %}negative{% endif %}">
+            <strong>Interprétation :</strong>
+            {% if prediction.global_accuracy > 0.55 %}
+            Le modèle présente une accuracy supérieure à 55% — il capture un signal exploitable.
+            Les barres vertes montrent les périodes profitables. Plus la granularité est fine (jour), plus le modèle
+            montre sa capacité de prédiction à court terme.
+            {% elif prediction.global_accuracy > 0.51 %}
+            Le modèle est légèrement au-dessus du hasard. L'edge est faible et pourrait être absorbé par les frais de
+            transaction.
+            Essayez d'améliorer les features ou de changer d'algorithme.
+            {% else %}
+            Le modèle ne surpasse pas le hasard sur cette période.
+            Il n'est pas recommandé de l'utiliser en production.
+            {% endif %}
+            <br><br>
+            <strong>💡 Court terme vs Long terme :</strong>
+            Le marché des changes (Forex) est plus prédictible à court terme (intra-journalier) qu'à long terme.
+            Passez de "Jour" à "Semaine" et "Mois" pour observer cette tendance.
+        </div>
+    </div>
+</div>
+
+<!-- Paramètres du modèle -->
+{% if prediction.meta %}
+<div class="card mb-3">
+    <div class="card-title"><span class="icon">⚙️</span> Paramètres du Modèle</div>
+    <div class="grid-3">
+        <div>
+            <div class="stat-label">Algorithme</div>
+            <div style="font-weight: 600; margin-top: 4px;">{{ prediction.meta.get('algorithm', 'N/A') }}</div>
+        </div>
+        <div>
+            <div class="stat-label">Entraîné le</div>
+            <div style="font-weight: 600; margin-top: 4px;">{{ prediction.meta.get('timestamp', '')[:10] }}</div>
+        </div>
+        <div>
+            <div class="stat-label">Auteur</div>
+            <div style="font-weight: 600; margin-top: 4px;">{{ prediction.meta.get('author', 'N/A') }}</div>
+        </div>
+    </div>
+    {% if prediction.meta.params %}
+    <div class="mt-2">
+        <div class="stat-label mb-1">Hyperparamètres</div>
+        <div class="checkbox-group">
+            {% for k, v in prediction.meta.params.items() %}
+            <span class="badge badge-muted">{{ k }} = {{ v }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    {% if prediction.meta.features is defined %}
+    <div class="mt-2">
+        <div class="stat-label mb-1">Features utilisées</div>
+        <div class="checkbox-group">
+            {% for feat in prediction.meta.features %}
+            <span class="badge badge-gold">{{ feat }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Classification Report résumé -->
+{% if evaluation and evaluation.classification_report %}
+<div class="card">
+    <div class="card-title"><span class="icon">📋</span> Performance Détaillée (Classification Report)</div>
+    <div class="report-grid">
+        <div class="report-metric">
+            <div class="value">{{ "%.1f"|format(evaluation.accuracy * 100) }}%</div>
+            <div class="label">Accuracy</div>
+        </div>
+        {% set cr = evaluation.classification_report %}
+        {% if 'macro avg' in cr %}
+        <div class="report-metric">
+            <div class="value">{{ "%.1f"|format(cr['macro avg']['precision'] * 100) }}%</div>
+            <div class="label">Precision</div>
+        </div>
+        <div class="report-metric">
+            <div class="value">{{ "%.1f"|format(cr['macro avg']['recall'] * 100) }}%</div>
+            <div class="label">Recall</div>
+        </div>
+        <div class="report-metric">
+            <div class="value">{{ "%.1f"|format(cr['macro avg']['f1-score'] * 100) }}%</div>
+            <div class="label">F1-Score</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="text-muted mt-2" style="font-size: 12px;">
+        <strong>Guide de lecture :</strong>
+        <ul style="padding-left: 18px; line-height: 2;">
+            <li><strong>Accuracy ~50%</strong> : Modèle aléatoire (coin toss). Non exploitable.</li>
+            <li><strong>Accuracy 52-55%</strong> : Signal faible. Peut être profitable avec un bon money management.
+            </li>
+            <li><strong>Accuracy >55%</strong> : Signal solide. Le modèle a appris un pattern réel du marché.</li>
+            <li><strong>Precision</strong> : Parmi les prédictions "Hausse", quel % est vrai ?</li>
+            <li><strong>Recall</strong> : Parmi les vraies "Hausse", quel % est détecté ?</li>
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="alert alert-danger">
+    {{ prediction.error if prediction and prediction.error is defined else "Erreur lors de la prédiction. Vérifiez que
+    l'API FastAPI est démarrée." }}
+</div>
+{% endif %}
+{% endblock %}

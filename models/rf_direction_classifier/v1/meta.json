@@ -1,0 +1,15 @@
+{
+    "version": "v1",
+    "timestamp": "2026-02-11T16:48:58.825398",
+    "author": "JCLoirat",
+    "params": {
+        "n_estimators": 50,
+        "max_depth": 3,
+        "random_state": 42
+    },
+    "metrics": {
+        "accuracy": 0.5134397817539919,
+        "f1_score": 0.3425845620121422
+    },
+    "path": "../models\\rf_direction_classifier\\v1\\model.pkl"
+}

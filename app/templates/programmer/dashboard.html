@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Programmeur — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🔧 Dashboard Programmeur</h2>
+    <p>Vue d'ensemble des modèles, données et publications.</p>
+</div>
+
+<!-- Stats globales -->
+{% if summary and summary is mapping and 'error' not in summary %}
+<div class="grid-4 mb-3">
+    {% for year, info in summary.items() %}
+    <div class="stat-card">
+        <div class="stat-label">{{ year }} {% if year == '2022' %}(Train){% elif year == '2023' %}(Val){% else
+            %}(Test){% endif %}</div>
+        <div class="stat-value">{{ info.get('nb_rows', '?') }}</div>
+        <div class="stat-change">Close moy: {{ info.get('close_mean', '?') }}</div>
+    </div>
+    {% endfor %}
+    <div class="stat-card">
+        <div class="stat-label">Modèles Publiés</div>
+        <div class="stat-value">{{ published|length if published is iterable and published is not mapping else 0 }}
+        </div>
+        <div class="stat-change positive">Disponibles pour l'utilisateur</div>
+    </div>
+</div>
+{% elif summary and summary is mapping and 'error' in summary %}
+<div class="alert alert-danger">{{ summary.error }}</div>
+{% endif %}
+
+<!-- Liste des Modèles -->
+<div class="card mt-3">
+    <div class="card-title"><span class="icon">📦</span> Modèles dans le Registry</div>
+
+    {% if models and models is mapping and 'error' not in models %}
+    {% for model_name, versions in models.items() %}
+    <div class="card mb-2" style="background: var(--bg-secondary); border: 1px solid var(--border-light);">
+        <div class="flex-between mb-2">
+            <div>
+                <h3 style="font-size: 16px;">{{ model_name }}</h3>
+                <span class="text-muted" style="font-size: 13px;">{{ versions|length }} version(s)</span>
+            </div>
+            <a href="{{ url_for('programmer_model_detail', model_name=model_name) }}" class="btn btn-outline btn-sm">
+                Détails →
+            </a>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Date</th>
+                        <th>Accuracy</th>
+                        <th>F1 Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in versions %}
+                    <tr>
+                        <td><span class="badge badge-blue">{{ v.version }}</span></td>
+                        <td class="text-muted">{{ v.timestamp[:10] if v.timestamp else '?' }}</td>
+                        <td class="mono">
+                            {% if v.metrics and v.metrics.accuracy is defined %}
+                            {% set acc = v.metrics.accuracy %}
+                            <span class="{% if acc > 0.55 %}text-green{% elif acc < 0.51 %}text-red{% endif %}">
+                                {{ "%.2f%%"|format(acc * 100) }}
+                            </span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="mono">
+                            {% if v.metrics and v.metrics.f1_score is defined %}
+                            {{ "%.4f"|format(v.metrics.f1_score) }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('programmer_evaluate', model_name=model_name, version=v.version) }}"
+                                    class="btn btn-outline btn-sm">📊 Évaluer</a>
+                                <form method="post" action="{{ url_for('programmer_publish') }}"
+                                    style="display:inline;">
+                                    <input type="hidden" name="model_name" value="{{ model_name }}">
+                                    <input type="hidden" name="version" value="{{ v.version }}">
+                                    <button type="submit" class="btn btn-success btn-sm">🚀 Publier</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted">Aucun modèle trouvé. <a href="{{ url_for('programmer_train') }}">Entraîner un premier modèle
+            →</a></p>
+    {% endif %}
+</div>
+
+<!-- Modèles Publiés -->
+{% if published and published is iterable and published is not mapping and published|length > 0 %}
+<div class="card mt-3">
+    <div class="card-title"><span class="icon">🚀</span> Modèles Publiés (visibles par l'utilisateur)</div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Modèle</th>
+                    <th>Version</th>
+                    <th>Publié le</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in published %}
+                <tr>
+                    <td>{{ p.model_name }}</td>
+                    <td><span class="badge badge-green">{{ p.version }}</span></td>
+                    <td class="text-muted">{{ p.published_at[:10] if p.published_at else '?' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('programmer_unpublish') }}" style="display:inline;">
+                            <input type="hidden" name="model_name" value="{{ p.model_name }}">
+                            <input type="hidden" name="version" value="{{ p.version }}">
+                            <button type="submit" class="btn btn-danger btn-sm">❌ Retirer</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
