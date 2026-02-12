@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Analyses - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Analyses et Resultats</h1>
+
+<!-- ── Graphique de prix interactif (Plotly) ────────────────── -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        Cours GBP/USD (M15)
+        <div>
+            <button class="btn btn-sm btn-outline-primary" onclick="loadPrice(2022)">2022 (Train)</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="loadPrice(2023)">2023 (Val)</button>
+            <button class="btn btn-sm btn-outline-primary active" onclick="loadPrice(2024)">2024 (Test)</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="price-chart" style="width:100%; height:500px;"></div>
+    </div>
+</div>
+
+<!-- ── Tableau baseline coloré ─────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Performance des strategies baseline</div>
+    <div class="card-body p-0">
+        {% if baseline_summary %}
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Annee</th>
+                        <th>Periode</th>
+                        <th>Strategie</th>
+                        <th class="text-end">Profit (%)</th>
+                        <th class="text-end">Max DD (%)</th>
+                        <th class="text-end">Sharpe</th>
+                        <th class="text-end">Profit Factor</th>
+                        <th class="text-end">Win Rate (%)</th>
+                        <th class="text-end">Nb Trades</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in baseline_summary %}
+                    <tr>
+                        <td>{{ row['Année'] }}</td>
+                        <td><span
+                                class="badge {% if row['Période'] == 'Train' %}bg-primary{% elif row['Période'] == 'Validation' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{
+                                row['Période'] }}</span></td>
+                        <td><strong>{{ row['Stratégie'] }}</strong></td>
+                        <td class="text-end">
+                            {% set profit = row['Profit (%)'] | float %}
+                            <span
+                                class="{% if profit > 0 %}text-success{% elif profit < 0 %}text-danger{% else %}text-muted{% endif %}"
+                                style="font-weight:600;">
+                                {{ "+" if profit > 0 }}{{ row['Profit (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set dd = row['Max DD (%)'] | float %}
+                            <span
+                                class="{% if dd > -5 %}text-success{% elif dd > -20 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ row['Max DD (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set sharpe = row['Sharpe'] | float %}
+                            <span
+                                class="{% if sharpe > 1 %}text-success{% elif sharpe > 0 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ row['Sharpe'] }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set pf = row['Profit Factor'] | float %}
+                            <span
+                                class="{% if pf > 1 %}text-success{% elif pf > 0.8 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ row['Profit Factor'] }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set wr = row['Win Rate (%)'] | float %}
+                            <span
+                                class="{% if wr > 50 %}text-success{% elif wr > 40 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ row['Win Rate (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end text-muted">{{ row['Nb Trades'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ── Graphiques baseline (grande taille + modal) ─────────── -->
+<div class="card mb-4">
+    <div class="card-header">Graphiques de comparaison</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for img in baseline_images %}
+            <div class="col-12">
+                <img src="/images/baseline/{{ img }}" alt="{{ img }}" class="img-chart" style="cursor:pointer;"
+                    data-bs-toggle="modal" data-bs-target="#imgModal"
+                    onclick="document.getElementById('modalImg').src=this.src">
+                <p class="text-muted text-center mt-1" style="font-size:0.85rem;">{{ img.replace('_', '
+                    ').replace('.png', '') | title }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ── Graphiques EDA (grande taille + modal) ──────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Analyse exploratoire des donnees (EDA)</div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for img in eda_images %}
+            <div class="col-12">
+                <img src="/images/eda/{{ img }}" alt="{{ img }}" class="img-chart" style="cursor:pointer;"
+                    data-bs-toggle="modal" data-bs-target="#imgModal"
+                    onclick="document.getElementById('modalImg').src=this.src">
+                <p class="text-muted text-center mt-1" style="font-size:0.85rem;">{{ img.replace('_', '
+                    ').replace('.png', '')[3:] | title }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal plein écran pour les images ────────────────────── -->
+<div class="modal fade" id="imgModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content" style="background:rgba(0,0,0,0.95);">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-flex align-items-center justify-content-center">
+                <img id="modalImg" src="" style="max-width:95%; max-height:90vh;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+    async function loadPrice(year) {
+        // Update active button
+        document.querySelectorAll('.card-header .btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        const r = await fetch(`/api/price_data/${year}`);
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+
+        const trace = {
+            x: d.timestamp,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+            type: 'candlestick',
+            increasing: { line: { color: '#22c55e' }, fillcolor: '#22c55e' },
+            decreasing: { line: { color: '#ef4444' }, fillcolor: '#ef4444' },
+        };
+
+        const layout = {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: '#0f1117',
+            font: { color: '#8b8fa3' },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            xaxis: {
+                rangeslider: { visible: false },
+                gridcolor: 'rgba(255,255,255,0.05)',
+                type: 'category',
+                nticks: 12,
+            },
+            yaxis: {
+                gridcolor: 'rgba(255,255,255,0.05)',
+                title: 'Prix',
+            },
+        };
+
+        Plotly.newPlot('price-chart', [trace], layout, { responsive: true, displayModeBar: true });
+    }
+
+    // Default year
+    loadPrice(2024);
+</script>
+{% endblock %}

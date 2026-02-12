@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Tableau de bord</h1>
+
+<!-- ── Cartes de statistiques ──────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card p-3">
+            <div class="stat-label">Statut du modele</div>
+            {% if model.exists %}
+            <div class="stat-value text-success">Entraîné</div>
+            <small class="text-muted">{{ model.size }} &middot; {{ model.date }}</small>
+            {% else %}
+            <div class="stat-value text-danger">Non entraîné</div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3">
+            <div class="stat-label">Algorithme</div>
+            <div class="stat-value">{{ config.algorithm if config else "N/A" }}</div>
+            <small class="text-muted">Stable-Baselines3</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3">
+            <div class="stat-label">Timesteps</div>
+            <div class="stat-value">{{ "{:,}".format(config.total_timesteps) if config else "N/A" }}</div>
+            <small class="text-muted">Steps d'entraînement</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card p-3">
+            <div class="stat-label">API FastAPI</div>
+            <div class="stat-value" id="api-status">...</div>
+            <small class="text-muted">Port 8000</small>
+        </div>
+    </div>
+</div>
+
+<!-- ── Hyperparamètres ─────────────────────────────────────── -->
+{% if config %}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Hyperparamètres du modèle</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Learning Rate</td>
+                            <td class="text-end"><code>{{ config.learning_rate }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Gamma (discount)</td>
+                            <td class="text-end"><code>{{ config.gamma }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Batch Size</td>
+                            <td class="text-end"><code>{{ config.batch_size }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Epochs</td>
+                            <td class="text-end"><code>{{ config.n_epochs }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Clip Range</td>
+                            <td class="text-end"><code>{{ config.clip_range }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Entropy Coef</td>
+                            <td class="text-end"><code>{{ config.ent_coef }}</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Paramètres de l'environnement</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Window Size</td>
+                            <td class="text-end"><code>{{ config.window_size }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Transaction Cost</td>
+                            <td class="text-end"><code>{{ config.transaction_cost }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Drawdown Penalty</td>
+                            <td class="text-end"><code>{{ config.drawdown_penalty }}</code></td>
+                        </tr>
+                        <tr>
+                            <td>Seed</td>
+                            <td class="text-end"><code>{{ config.seed }}</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Données ─────────────────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Données d'entraînement (GBP/USD)</div>
+    <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Année</th>
+                    <th>Fichier M1 (brut)</th>
+                    <th>Fichier M15 (agrégé)</th>
+                    <th class="text-end">Bougies M15</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in data %}
+                <tr>
+                    <td><strong>{{ d.year }}</strong></td>
+                    <td>{{ d.m1_size if d.m1_size else "-" }}</td>
+                    <td>{{ d.m15_size if d.m15_size else "-" }}</td>
+                    <td class="text-end">{{ "{:,}".format(d.m15_rows) if d.m15_rows else "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (async () => {
+        const el = document.getElementById('api-status');
+        try {
+            const r = await fetch('http://127.0.0.1:8000/status');
+            const d = await r.json();
+            el.textContent = d.model_loaded ? 'En ligne' : 'En ligne (sans modèle)';
+            el.classList.add(d.model_loaded ? 'text-success' : 'text-warning');
+        } catch {
+            el.textContent = 'Hors ligne';
+            el.classList.add('text-danger');
+        }
+    })();
+</script>
+{% endblock %}

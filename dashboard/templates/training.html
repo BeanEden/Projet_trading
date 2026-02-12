@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Entrainement - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Entrainement du modele</h1>
+
+{% if not authenticated %}
+<!-- ── Formulaire PIN ──────────────────────────────────────── -->
+<div class="card" style="max-width: 400px; margin: 80px auto;">
+    <div class="card-header text-center">
+        <i class="bi bi-lock" style="font-size:1.5rem;"></i> Acces protege
+    </div>
+    <div class="card-body">
+        <p class="text-muted text-center mb-3">Entrez le code PIN pour acceder aux controles d'entrainement.</p>
+        {% if error %}
+        <div class="alert alert-danger py-2" style="font-size:0.9rem;">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/training/auth">
+            <div class="mb-3">
+                <input type="password" name="pin" class="form-control text-center" placeholder="Code PIN" maxlength="8"
+                    autofocus
+                    style="font-size:1.3rem; letter-spacing: 8px; background: var(--bg-main); border-color: var(--border); color: #fff;">
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Deverrouiller</button>
+        </form>
+    </div>
+</div>
+
+{% else %}
+<!-- ── Controles (authentifie) ─────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        Controle
+        <span class="badge bg-success"><i class="bi bi-unlock"></i> Autorise</span>
+    </div>
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-3">
+            <button id="btn-start" class="btn btn-success" onclick="startTraining()">
+                <i class="bi bi-play-fill"></i> Lancer l'entrainement
+            </button>
+            <button id="btn-stop" class="btn btn-outline-danger" onclick="stopTraining()" disabled>
+                <i class="bi bi-stop-fill"></i> Arreter
+            </button>
+            <span id="status-msg" class="text-muted ms-3"></span>
+        </div>
+        <small class="text-muted d-block mt-2">
+            Execute <code>python training/train_rl.py</code> en arriere-plan.
+        </small>
+    </div>
+</div>
+
+<!-- ── Logs ─────────────────────────────────────────────────── -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        Logs d'entrainement
+        <span id="log-status" class="badge badge-accent">Inactif</span>
+    </div>
+    <div class="card-body p-0">
+        <pre class="log-output m-0" id="logs" style="min-height:300px;"></pre>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if authenticated %}
+<script>
+    let pollId = null;
+
+    async function startTraining() {
+        const r = await fetch('/api/start_training', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'started') {
+            document.getElementById('status-msg').textContent = 'PID ' + d.pid;
+            setUI(true);
+            pollId = setInterval(fetchLogs, 2000);
+        } else {
+            alert(d.message);
+        }
+    }
+
+    async function stopTraining() {
+        const r = await fetch('/api/stop_training', { method: 'POST' });
+        const d = await r.json();
+        if (d.status === 'stopped') {
+            document.getElementById('status-msg').textContent = 'Arrete.';
+            setUI(false);
+            if (pollId) { clearInterval(pollId); pollId = null; }
+        }
+    }
+
+    async function fetchLogs() {
+        const r = await fetch('/api/logs');
+        const d = await r.json();
+        const pre = document.getElementById('logs');
+        pre.textContent = d.logs;
+        pre.scrollTop = pre.scrollHeight;
+    }
+
+    function setUI(active) {
+        document.getElementById('btn-start').disabled = active;
+        document.getElementById('btn-stop').disabled = !active;
+        const badge = document.getElementById('log-status');
+        badge.textContent = active ? 'En cours' : 'Inactif';
+        badge.className = 'badge ' + (active ? 'bg-success' : 'badge-accent');
+    }
+
+    (async () => {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+        setUI(d.training);
+        if (d.training && !pollId) pollId = setInterval(fetchLogs, 2000);
+        fetchLogs();
+    })();
+</script>
+{% endif %}
+{% endblock %}

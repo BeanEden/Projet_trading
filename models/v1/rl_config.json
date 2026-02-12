@@ -1,0 +1,14 @@
+{
+  "algorithm": "PPO",
+  "total_timesteps": 100000,
+  "learning_rate": 0.0003,
+  "gamma": 0.99,
+  "batch_size": 64,
+  "n_epochs": 10,
+  "clip_range": 0.2,
+  "ent_coef": 0.01,
+  "seed": 42,
+  "window_size": 20,
+  "transaction_cost": 0.0002,
+  "drawdown_penalty": 0.5
+}
