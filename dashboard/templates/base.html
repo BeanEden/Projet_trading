@@ -183,6 +183,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link {% if request.path == '/comparison' %}active{% endif %}" href="/comparison">
+                    <i class="bi bi-bar-chart-steps"></i>Comparaison
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {% if request.path == '/training' %}active{% endif %}" href="/training">
                     <i class="bi bi-cpu"></i>Entrainement
                 </a>

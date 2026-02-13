@@ -14,13 +14,34 @@ app.secret_key = "trading_bot_secret_2024"
 
 # ── Configuration ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_DIR = BASE_DIR / "models" / "v1"
+MODELS_ROOT = BASE_DIR / "models"
 DATA_DIR = BASE_DIR / "data"
 EDA_DIR = BASE_DIR / "evaluation" / "eda"
 BASELINE_DIR = BASE_DIR / "evaluation" / "baseline_results"
 LOG_FILE = BASE_DIR / "training.log"
 
 TRAINING_PIN = "4242"
+
+
+# ── Model Metadata (Descriptions) ──────────────────────────────
+MODEL_METADATA = {
+    "v1": {"method": "PPO Basic", "desc": "Modèle de base PPO sans features complexes."},
+    "v2": {"method": "PPO + Indicators", "desc": "Ajout de RSI, MACD et Bollinger Bands."},
+    "v3": {"method": "PPO + Patterns", "desc": "Tentative de détection de patterns (Dozi, Engulfing)."},
+    "v4": {"method": "PPO + News", "desc": "Intégration expérimentale de sentiment (simulé)."},
+    "v5": {"method": "PPO + Auto TP/SL", "desc": "Gestion dynamique du Take Profit et Stop Loss (Target/Stop basés sur volatilité)."},
+    "v5b": {"method": "PPO + Aggif", "desc": "Variante agressive de V5."},
+    "v5c": {"method": "PPO + Conservative", "desc": "Variante conservatrice de V5."},
+    "v5d": {"method": "PPO + Scalping", "desc": "Stratégie court-terme (High Frequency, Low TP)."},
+    "v6": {"method": "PPO + Time Features", "desc": "Ajout de l'encodage cyclique de l'heure et du jour."},
+    "v6_fast": {"method": "PPO + Time (Fast)", "desc": "Entraînement rapide de V6."},
+    "v7": {"method": "DQN", "desc": "Test de l'algorithme Deep Q-Network (Off-policy).Moins stable que PPO."},
+    "v8": {"method": "PPO + Regime (ADX)", "desc": "Détection de régime de marché (Tendance vs Range) avec ADX et Ratio ATR."},
+    "v8_fixed": {"method": "PPO + Regime + Fix", "desc": "Correction du bug 'Double Spread'. Version robuste de V8."},
+    "v9": {"method": "PPO + Regime (Optimized)", "desc": "Version V8 Fixed renommée. Candidat production."},
+    "v9_optuna": {"method": "PPO + Hyperopt", "desc": "Optimisation Bayésienne des hyperparamètres sur V8."},
+    "v10": {"method": "PPO + 2025 Focus", "desc": "Entraînement étendu incluant 2024 pour maximiser 2025."},
+}
 
 training_process = None
 
@@ -40,8 +61,21 @@ def _load_m15(year):
 
 
 # ── Helpers ────────────────────────────────────────────────────
-def load_config():
-    config_path = MODEL_DIR / "rl_config.json"
+def get_available_models():
+    if not MODELS_ROOT.exists():
+        return []
+    # List subdirectories starting with 'v'
+    dirs = [d.name for d in MODELS_ROOT.iterdir() if d.is_dir() and d.name.startswith("v")]
+    # Sort nicely (v1, v2, ... v10)
+    try:
+        dirs.sort(key=lambda x: (int(''.join(filter(str.isdigit, x))) if any(c.isdigit() for c in x) else 0, x))
+    except:
+        dirs.sort()
+    return dirs
+
+
+def load_config(version):
+    config_path = MODELS_ROOT / version / "rl_config.json"
     if config_path.exists():
         with open(config_path, "r") as f:
             return json.load(f)
@@ -62,7 +96,7 @@ def load_baseline_summary():
 
 def get_data_summary():
     summary = []
-    for year in [2022, 2023, 2024]:
+    for year in [2022, 2023, 2024, 2025]:
         m1 = DATA_DIR / f"DAT_MT_GBPUSD_M1_{year}.csv"
         m15 = DATA_DIR / "m15" / f"GBPUSD_M15_{year}.csv"
         entry = {"year": year}
@@ -76,31 +110,95 @@ def get_data_summary():
     return summary
 
 
-def get_model_info():
-    model_path = MODEL_DIR / "ppo_trading.zip"
-    if model_path.exists():
+def get_model_info(version):
+    model_dir = MODELS_ROOT / version
+    # Check for zip file, name could vary
+    candidates = ["ppo_trading_best.zip", "dqn_trading_best.zip", "ppo_trading.zip", "dqn_trading.zip"]
+    model_path = None
+    for c in candidates:
+        p = model_dir / c
+        if p.exists():
+            model_path = p
+            break
+
+    if model_path:
         stat = model_path.stat()
         return {
+            "name": version,
             "exists": True,
+            "file": model_path.name,
             "size": f"{stat.st_size / 1024 / 1024:.2f} MB",
             "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(stat.st_mtime)),
         }
-    return {"exists": False}
+    return {"name": version, "exists": False}
+
+
+def load_eval_results(version):
+    path = MODELS_ROOT / version / "eval_results.json"
+    if path.exists():
+        with open(path, "r") as f:
+            data = json.load(f)
+            
+        # Calculate derived metrics for each year
+        for year, res in data.items():
+            if "win_rate" in res and "avg_win" in res and "avg_loss" in res:
+                wr = res["win_rate"] / 100.0
+                avg_win = res["avg_win"]
+                avg_loss = abs(res["avg_loss"])
+                
+                # Precision = Win Rate
+                res["precision"] = res["win_rate"]
+                
+                # Profit Factor
+                if avg_loss > 0 and (1 - wr) > 0:
+                    profit_factor = (wr * avg_win) / ((1 - wr) * avg_loss)
+                    res["profit_factor"] = round(profit_factor, 2)
+                else:
+                    res["profit_factor"] = 99.99 if wr > 0.5 else 0.0
+
+                # F1 Score (Approximate based on Trade Success)
+                # Treating "Win" as Positive Class. 
+                # Recall is hard to define without "Missed Trades", but we can use:
+                # F1 = 2 * Precision * Recall / (Precision + Recall)
+                # Assuming Recall ~ Precision (optimistic) or Recall = 1 (executed trades only)
+                # Let's use F1 of the *executed trades classification*: 
+                # TP / (TP + 0.5(FP + FN)). If FN=0 (we don't know missed), F1 = 2TP / (2TP + FP).
+                # 2 * Win / (2 * Win + Loss)
+                # 2 * wr / (2 * wr + (1-wr)) = 2*wr / (wr + 1)
+                res["f1_score"] = round(2 * wr / (wr + 1) * 100, 2)
+
+        return data
+    return None
 
 
 # ── Pages ──────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    config = load_config()
-    model_info = get_model_info()
+    version = request.args.get("version")
+    models = get_available_models()
+    
+    if not version and models:
+        # Default to the latest model
+        version = models[-1]
+    elif not version:
+        version = "v1"
+
+    config = load_config(version)
+    model_info = get_model_info(version)
+    eval_results = load_eval_results(version)
     data_summary = get_data_summary()
-    return render_template("index.html", config=config, model=model_info, data=data_summary)
+    return render_template("index.html", config=config, model=model_info, eval_results=eval_results, data=data_summary, models=models, current_version=version, metadata=MODEL_METADATA.get(version, {}))
 
 
 @app.route("/monitoring")
 def monitoring():
     baseline_summary = load_baseline_summary()
     return render_template("monitoring.html", baseline_summary=baseline_summary)
+
+
+@app.route("/comparison")
+def comparison():
+    return render_template("comparison.html")
 
 
 @app.route("/training")
@@ -236,6 +334,21 @@ def metrics_comparison():
         "sharpes": sharpes,
         "win_rates": win_rates,
     })
+
+
+@app.route("/api/models_comparison")
+def models_comparison_api():
+    models = get_available_models()
+    data = {}
+    
+    # Structure: { "v1": { "2022": 10, "2023": -5 ... }, "v9": ... }
+    for m in models:
+        res = load_eval_results(m)
+        if res:
+            res["meta"] = MODEL_METADATA.get(m, {"method": "N/A", "desc": ""})
+            data[m] = res
+            
+    return jsonify(data)
 
 
 # ── API: Training ─────────────────────────────────────────────

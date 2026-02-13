@@ -1,0 +1,54 @@
+{
+  "2022": {
+    "profit_pct": -31.889241958456992,
+    "final_equity": 6811.0758041543,
+    "max_drawdown_pct": 32.353467418123685,
+    "nb_trades": 1190,
+    "win_rate": 40.50420168067227,
+    "avg_win": 0.26084749016556874,
+    "avg_loss": -0.2061247181575522,
+    "tp_count": 418,
+    "sl_count": 661,
+    "timeout_count": 111,
+    "avg_hold": 15.365546218487395
+  },
+  "2023": {
+    "profit_pct": -21.25763288088436,
+    "final_equity": 7874.236711911564,
+    "max_drawdown_pct": 23.03249839437762,
+    "nb_trades": 774,
+    "win_rate": 41.98966408268734,
+    "avg_win": 0.23290895172362572,
+    "avg_loss": -0.19548980834651009,
+    "tp_count": 235,
+    "sl_count": 390,
+    "timeout_count": 149,
+    "avg_hold": 22.310077519379846
+  },
+  "2024": {
+    "profit_pct": -19.780008641535673,
+    "final_equity": 8021.999135846433,
+    "max_drawdown_pct": 21.09046378425214,
+    "nb_trades": 693,
+    "win_rate": 42.56854256854257,
+    "avg_win": 0.19667768888923276,
+    "avg_loss": -0.1746376294297102,
+    "tp_count": 155,
+    "sl_count": 287,
+    "timeout_count": 251,
+    "avg_hold": 30.486291486291485
+  },
+  "2025": {
+    "profit_pct": -24.153522595119657,
+    "final_equity": 7584.647740488034,
+    "max_drawdown_pct": 25.076736049706618,
+    "nb_trades": 794,
+    "win_rate": 41.43576826196473,
+    "avg_win": 0.21629680033185233,
+    "avg_loss": -0.18644931277933646,
+    "tp_count": 208,
+    "sl_count": 372,
+    "timeout_count": 214,
+    "avg_hold": 25.826196473551637
+  }
+}

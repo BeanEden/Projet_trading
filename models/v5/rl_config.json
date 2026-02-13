@@ -1,0 +1,25 @@
+{
+    "algorithm": "PPO",
+    "total_timesteps": 500000,
+    "learning_rate": 0.0003,
+    "gamma": 0.99,
+    "batch_size": 256,
+    "n_steps": 2048,
+    "n_epochs": 10,
+    "clip_range": 0.2,
+    "ent_coef": 0.01,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "gae_lambda": 0.95,
+    "seed": 42,
+    "window_size": 30,
+    "spread": 0.00015,
+    "take_profit_pct": 0.003,
+    "stop_loss_pct": 0.002,
+    "max_hold": 48,
+    "cooldown": 4,
+    "net_arch": [
+        128,
+        64
+    ]
+}
