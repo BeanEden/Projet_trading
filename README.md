@@ -160,9 +160,3 @@ Projet_trading/
 *   **Jean-Corentin Loirat**
 
 ---
-
-<div align="center">
-
-Fait avec ❤️ et ☕ par l'équipe Data Science
-
-</div>
