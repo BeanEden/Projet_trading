@@ -104,7 +104,7 @@ python dashboard/app.py
 Pour une immersion profonde dans le processus de science des données, incluant l'EDA, l'ingénierie des caractéristiques et l'évaluation des modèles :
 
 ```bash
-jupyter notebook notebooks/T09_Evaluation_Comparative.ipynb
+jupyter notebook notebooks/Master Notebook.ipynb
 ```
 
 ---
