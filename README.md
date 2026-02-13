@@ -109,7 +109,31 @@ jupyter notebook notebooks/Master Notebook.ipynb
 
 ---
 
-## 5. Matrice de Performance
+## 5. Déploiement avec Docker
+
+Le projet est entièrement conteneurisé, ce qui permet de lancer l'API et le Tableau de Bord en une seule commande, sans avoir à installer de dépendances localement.
+
+### Prérequis
+*   [Docker Desktop](https://www.docker.com/products/docker-desktop/) installé et lancé.
+
+### Lancement Rapide (Recommandé)
+```bash
+# Construire et lancer les conteneurs
+docker compose up --build
+```
+
+Une fois lancé :
+*   **Tableau de Bord** : accessible sur `http://localhost:5000`
+*   **API (Documentation)** : accessible sur `http://localhost:8000/docs`
+
+Pour arrêter les services :
+```bash
+docker compose down
+```
+
+---
+
+## 6. Matrice de Performance
 
 Nous évaluons rigoureusement nos modèles sur des jeux de données strictement séparés pour garantir l'absence de fuite de données.
 
