@@ -29,7 +29,20 @@ def api_get(endpoint, params=None):
 def api_post(endpoint, json_data=None):
     """Helper POST vers FastAPI."""
     try:
-        r = requests.post(f"{API_BASE}{endpoint}", json=json_data, timeout=300)
+        r = requests.post(f"{API_BASE}{endpoint}", json=json_data, timeout=600)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.ConnectionError:
+        return {"error": "❌ API FastAPI non accessible."}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+
+def api_delete(endpoint):
+    """Helper DELETE vers FastAPI."""
+    try:
+        r = requests.delete(f"{API_BASE}{endpoint}", timeout=600)
         r.raise_for_status()
         return r.json()
     except requests.exceptions.ConnectionError:
@@ -132,7 +145,19 @@ def programmer_train():
             "features": features,
             "params": params,
             "author": author,
+            "grid_search": request.form.get("grid_search") == "on"
         })
+
+        # Fetch charts for immediate feedback
+        if result and "version" in result:
+            version = result["version"]
+            # We can reuse the existing endpoints or just specific charts
+            try:
+                result["confusion"] = api_get(f"/charts/confusion/{model_name}/{version}").get("image")
+                result["roc"] = api_get(f"/charts/roc/{model_name}/{version}").get("image")
+                result["importance"] = api_get(f"/charts/feature_importance/{model_name}/{version}").get("image")
+            except Exception as e:
+                print(f"Error fetching charts: {e}")
 
     return render_template("programmer/train.html",
                          columns=columns.get("columns", []),
@@ -166,6 +191,21 @@ def programmer_unpublish():
     version = request.form.get("version")
     api_post("/registry/unpublish", {"model_name": model_name, "version": version})
     flash(f"❎ {model_name} {version} retiré de la publication.", "info")
+    return redirect(url_for("programmer_dashboard"))
+
+
+@app.route("/programmer/delete", methods=["POST"])
+def programmer_delete_model():
+    model_name = request.form.get("model_name")
+    version = request.form.get("version")
+    
+    res = api_delete(f"/registry/model/{model_name}/{version}")
+    
+    if "error" in res:
+        flash(f"Erreur suppression: {res['error']}", "danger")
+    else:
+        flash(f"🗑️ Modèle {model_name} {version} supprimé.", "warning")
+        
     return redirect(url_for("programmer_dashboard"))
 
 

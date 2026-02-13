@@ -51,6 +51,7 @@
                 <thead>
                     <tr>
                         <th>Version</th>
+                        <th>Algo</th>
                         <th>Date</th>
                         <th>Accuracy</th>
                         <th>F1 Score</th>
@@ -61,6 +62,7 @@
                     {% for v in versions %}
                     <tr>
                         <td><span class="badge badge-blue">{{ v.version }}</span></td>
+                        <td><span class="text-muted" style="font-size: 13px;">{{ v.algorithm|default('?') }}</span></td>
                         <td class="text-muted">{{ v.timestamp[:10] if v.timestamp else '?' }}</td>
                         <td class="mono">
                             {% if v.metrics and v.metrics.accuracy is defined %}
@@ -84,6 +86,13 @@
                                     <input type="hidden" name="model_name" value="{{ model_name }}">
                                     <input type="hidden" name="version" value="{{ v.version }}">
                                     <button type="submit" class="btn btn-success btn-sm">🚀 Publier</button>
+                                </form>
+                                <form method="post" action="{{ url_for('programmer_delete_model') }}"
+                                    style="display:inline;"
+                                    onsubmit="return confirm('⚠️ Êtes-vous sûr de vouloir supprimer {{ model_name }} {{ v.version }} ? Cette action est irréversible.');">
+                                    <input type="hidden" name="model_name" value="{{ model_name }}">
+                                    <input type="hidden" name="version" value="{{ v.version }}">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Supprimer">🗑️</button>
                                 </form>
                             </div>
                         </td>

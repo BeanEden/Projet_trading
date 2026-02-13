@@ -17,6 +17,47 @@
     | F1 : <strong>{{ "%.4f"|format(result.metrics.f1_score) }}</strong>
     {% if result.metrics.roc_auc is defined %}| AUC : <strong>{{ "%.4f"|format(result.metrics.roc_auc) }}</strong>{%
     endif %}
+
+    <hr>
+
+    <!-- Résultats graphiques -->
+    <div class="grid-3">
+        {% if result.confusion %}
+        <div class="card p-2" style="background:#fff; color:#000;">
+            <img src="{{ result.confusion }}" class="img-fluid" style="border-radius:4px;">
+        </div>
+        {% endif %}
+
+        {% if result.roc %}
+        <div class="card p-2" style="background:#fff; color:#000;">
+            <img src="{{ result.roc }}" class="img-fluid" style="border-radius:4px;">
+        </div>
+        {% endif %}
+
+        {% if result.importance %}
+        <div class="card p-2" style="background:#fff; color:#000;">
+            <img src="{{ result.importance }}" class="img-fluid" style="border-radius:4px;">
+        </div>
+        {% endif %}
+    </div>
+
+    {% if result.grid_search %}
+    <hr>
+    <div>
+        🔍 <strong>Meilleurs hyperparamètres (Grid Search) :</strong>
+        <ul style="margin-bottom:0; padding-left:20px;">
+            {% for k, v in result.best_params.items() %}
+            <li>{{ k }}: <strong>{{ v }}</strong></li>
+            {% endfor %}
+        </ul>
+        <small class="text-muted">Score validation croisée : {{ "%.4f"|format(result.grid_search.best_score) }}</small>
+    </div>
+    {% endif %}
+
+    <div style="margin-top:10px; text-align:right;">
+        <a href="{{ url_for('programmer_evaluate', model_name=request.form.model_name|default('rf_direction_classifier'), version=result.version) }}"
+            class="btn btn-sm btn-outline-primary">📊 Voir Rapport Complet</a>
+    </div>
 </div>
 {% endif %}
 {% endif %}
@@ -44,6 +85,13 @@
                     <option value="GradientBoosting">🚀 Gradient Boosting</option>
                     <option value="LogisticRegression">📏 Logistic Regression</option>
                 </select>
+
+                <div class="mt-2" style="display:flex; align-items:center;">
+                    <input type="checkbox" id="grid_search" name="grid_search" style="margin-right:8px;">
+                    <label for="grid_search" style="margin-bottom:0; font-weight:normal; cursor:pointer;">
+                        Utiliser <strong>Grid Search CV</strong> (Optimisation Auto)
+                    </label>
+                </div>
             </div>
 
             <!-- Params RF / GB -->
@@ -207,11 +255,55 @@
         }
         // Show loading overlay
         const overlay = document.getElementById('loadingOverlay');
+        const overlayTitle = document.querySelector('#loadingOverlay h3');
+        const overlayText = document.querySelector('#loadingOverlay p');
+        const isGrid = document.getElementById('grid_search').checked;
+
+        let steps = [];
+        let delays = [];
+
+        if (isGrid) {
+            steps = [
+                'Initialisation de Grid Search...',
+                'Chargement des données (3 années)...',
+                'Exploration des hyperparamètres...',
+                'Validation croisée (CV=3)...',
+                'Sélection du meilleur modèle...',
+                'Entraînement final...',
+                'Génération des graphiques...'
+            ];
+            delays = [0, 1500, 3500, 8000, 15000, 20000, 25000]; // Simulated delays
+            overlayTitle.innerText = 'Optimisation en cours…';
+            overlayText.innerHTML = 'Recherche des meilleurs hyperparamètres avec <strong>GridSearch CV</strong>.<br>Cela peut prendre quelques minutes.';
+        } else {
+            steps = [
+                'Initialisation...',
+                'Chargement des données (3 années)...',
+                'Entraînement du modèle...',
+                'Validation sur le jeu de test...',
+                'Calcul des métriques...',
+                'Finalisation...'
+            ];
+            delays = [0, 1000, 3000, 5000, 7000, 8500];
+            overlayTitle.innerText = 'Entraînement en cours…';
+            overlayText.innerHTML = 'Chargement des données + entraînement du modèle.<br>Veuillez patienter...';
+        }
+
         overlay.style.display = 'flex';
+
+        // Progress simulation
+        delays.forEach((delay, index) => {
+            setTimeout(() => {
+                if (steps[index]) {
+                    overlayText.innerHTML = `<strong>${steps[index]}</strong><br>Veuillez patienter...`;
+                }
+            }, delay);
+        });
+
         // Disable button
         const btn = document.getElementById('trainBtn');
         btn.disabled = true;
-        btn.innerHTML = '⏳ Entraînement en cours…';
+        btn.innerHTML = isGrid ? '⏳ Optimisation…' : '⏳ Entraînement en cours…';
         btn.style.opacity = '0.6';
     });
 </script>

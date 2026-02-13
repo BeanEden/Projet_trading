@@ -11,6 +11,7 @@ import pickle
 import io
 import base64
 import traceback
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,7 @@ from pydantic import BaseModel
 
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     classification_report,
@@ -149,6 +151,7 @@ class TrainRequest(BaseModel):
     features: list[str] = ["rsi_14", "ema_20", "ema_50", "atr_14", "adx_14"]
     params: dict = {"n_estimators": 100, "max_depth": 5, "random_state": 42}
     author: str = "JCLoirat"
+    grid_search: bool = False
 
 
 class PublishRequest(BaseModel):
@@ -246,6 +249,39 @@ def registry_unpublish(req: PublishRequest):
     return {"status": "ok"}
 
 
+@app.delete("/registry/model/{model_name}/{version}")
+def delete_model_version(model_name: str, version: str):
+    """Supprime une version spécifique d'un modèle (fichiers + entrée registry)."""
+    reg = _load_registry()
+    if model_name not in reg["models"]:
+        raise HTTPException(404, "Modèle introuvable")
+    
+    # Filter out the specific version
+    original_len = len(reg["models"][model_name])
+    reg["models"][model_name] = [m for m in reg["models"][model_name] if m["version"] != version]
+    
+    if len(reg["models"][model_name]) == original_len:
+         raise HTTPException(404, "Version introuvable")
+         
+    # Update published list if necessary
+    if "published" in reg:
+        reg["published"] = [p for p in reg.get("published", []) if not (p["model_name"] == model_name and p["version"] == version)]
+
+    # Delete files
+    version_dir = MODELS_DIR / model_name / version
+    if version_dir.exists():
+        shutil.rmtree(version_dir)
+        
+    # If no versions left, remove model key and dir? Optional.
+    # Let's keep the model key for now or remove if empty.
+    if not reg["models"][model_name]:
+        del reg["models"][model_name]
+        shutil.rmtree(MODELS_DIR / model_name, ignore_errors=True)
+        
+    _save_registry(reg)
+    return {"status": "ok", "message": f"Version {version} deleted"}
+
+
 # ════════════════════════════════════════════
 #  ROUTES : TRAINING
 # ════════════════════════════════════════════
@@ -275,7 +311,44 @@ def train_model(req: TrainRequest):
             raise HTTPException(400, f"Algorithme inconnu: {req.algorithm}")
 
         model = algo_cls(**req.params)
-        model.fit(X_train_s, y_train)
+        
+        best_params = req.params
+        grid_results = None
+
+        if req.grid_search:
+            # Param Grid Defaults
+            param_grid = {}
+            if req.algorithm == "RandomForest":
+                param_grid = {
+                    "n_estimators": [50, 100, 200],
+                    "max_depth": [3, 5, 10, None],
+                    "min_samples_split": [2, 5],
+                }
+            elif req.algorithm == "GradientBoosting":
+                param_grid = {
+                    "n_estimators": [50, 100, 200],
+                    "learning_rate": [0.01, 0.1, 0.2],
+                    "max_depth": [3, 5],
+                }
+            elif req.algorithm == "LogisticRegression":
+                param_grid = {
+                    "C": [0.01, 0.1, 1.0, 10.0, 100.0],
+                }
+            
+            # Grid Search
+            print(f"Starting GridSearchCV for {req.algorithm}...")
+            grid = GridSearchCV(model, param_grid, cv=3, scoring="accuracy", n_jobs=1)
+            grid.fit(X_train_s, y_train)
+            print("GridSearchCV Done.")
+            
+            model = grid.best_estimator_
+            best_params = grid.best_params_
+            grid_results = {
+                "best_score": round(grid.best_score_, 4),
+                "best_params": best_params
+            }
+        else:     
+            model.fit(X_train_s, y_train)
 
         y_pred = model.predict(X_test_s)
         y_proba = model.predict_proba(X_test_s)[:, 1] if hasattr(model, "predict_proba") else None
@@ -309,8 +382,9 @@ def train_model(req: TrainRequest):
             "author": req.author,
             "algorithm": req.algorithm,
             "features": feats,
-            "params": req.params,
+            "params": best_params,
             "metrics": metrics,
+            "grid_search": grid_results,
         }
         with open(model_dir / "meta.json", "w") as f:
             json.dump(meta, f, indent=4)
@@ -318,7 +392,7 @@ def train_model(req: TrainRequest):
         reg["models"][req.model_name].append(meta)
         _save_registry(reg)
 
-        return {"status": "ok", "version": version_tag, "metrics": metrics}
+        return {"status": "ok", "version": version_tag, "metrics": metrics, "grid_search": grid_results, "best_params": best_params}
     except HTTPException:
         raise
     except Exception as e:

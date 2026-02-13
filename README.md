@@ -290,7 +290,7 @@ Paramètres d’évaluation
  |   +-- v1/
  |   +-- v2/
 
-                                          7
+                                           7
  +--   training/
  +--   evaluation/
  +--   api/
@@ -316,5 +316,98 @@ Message clé
 
 
 
-                                          8
+                                           8
 
+
+---
+# 📘 Documentation Technique et Fonctionnelle du Projet
+
+## 1. Vue d'ensemble du Projet
+Ce projet implémente un système complet de décision de trading algorithmique pour la paire GBP/USD. Il couvre l'intégralité du pipeline de données, de l'ingestion brute à la prise de décision automatisée, en passant par le Machine Learning et une interface utilisateur web moderne.
+
+L'objectif est de fournir une plateforme robuste et simple d'accès permettant de :
+- **Analyser** des données financières haute fréquence (M1 transformé en M15).
+- **Entraîner et Comparer** des modèles d'IA prédictive (Random Forest, Gradient Boosting, etc.).
+- **Visualiser** les performances financières et les métriques techniques en toute transparence.
+- **Opérer** des prédictions via une API standardisée et une interface ergonomique.
+
+## 2. Architecture Technique
+Le système repose sur une architecture micro-services modulaire et robuste :
+
+*   **Frontend (Interface Utilisateur)** : Développé en **Flask** (Python). Il offre une interface "Cocooning Beige" soignée et intuitive pour visualiser les données, lancer des entraînements sans code et consulter les prédictions.
+*   **Backend (API)** : Développé en **FastAPI**. Il gère la logique métier "lourde" : chargement dynamique des modèles, inférence rapide, et communication sécurisée avec les données.
+*   **Data Science Core** : Centralisé dans un **Master Notebook** unifié (`Master_Trading_Notebook.ipynb`) qui permet de reproduire pas à pas l'importation, le nettoyage, le feature engineering et la modélisation à des fins de recherche.
+*   **Conteneurisation** : Architecture prête pour **Docker** pour garantir la portabilité et la reproductibilité quel que soit l'environnement.
+
+## 3. Workflow Data Science (Le "Cœur" du système)
+Le traitement des données suit un processus rigoureux et scientifique en 5 étapes, entièrement automatisé :
+
+1.  **Importation & Audit (T01)** : Chargement des données brutes M1 (1 minute) et audits qualité stricts (détection de trous de cotation, doublons, outliers).
+2.  **Agrégation (T02)** : Transformation technique des bougies M1 en bougies M15 (15 minutes) pour lisser la volatilité et réduire le bruit de marché.
+3.  **Nettoyage (T03)** : Filtrage intelligent des bougies incomplètes (faible volume de ticks) pour garantir la fiabilité statistique des modèles.
+4.  **Feature Engineering (T05)** : Création d'indicateurs techniques avancés pour "nourrir" l'IA :
+    *   *Dynamique* : RSI (Indice de Force Relative), Rendements logarithmiques.
+    *   *Tendance* : Moyennes Mobiles Exponentielles (EMA), MACD, ADX.
+    *   *Volatilité* : ATR, Bandes de Bollinger.
+5.  **Machine Learning (T07)** : Entraînement de modèles supervisés avec optimisation automatique des hyperparamètres (GridSearch) et validation temporelle stricte (Train: 2022, Val: 2023, Test: 2024) pour éviter le surapprentissage.
+
+## 4. Guide d'Installation et de Démarrage
+
+### Prérequis
+*   Python 3.8 ou supérieur
+*   Pip (gestionnaire de paquets Python)
+*   Navigateur web récent (Chrome, Firefox, Edge)
+
+### Installation des dépendances
+Ouvrez un terminal à la racine du projet et exécutez :
+```bash
+pip install -r requirements.txt
+```
+
+### Lancement de l'application
+Le système fonctionne en mode client-serveur. Vous devez lancer deux terminaux distincts.
+
+1.  **Lancer le Backend (API)** :
+    Dans le premier terminal :
+    ```bash
+    python -m uvicorn api.main:app --reload --port 8000
+    ```
+    *Le backend est prêt quand vous voyez "Application startup complete".*
+
+2.  **Lancer le Frontend (App Web)** :
+    Dans le second terminal :
+    ```bash
+    python -m app.app
+    ```
+    *Le frontend est prêt quand vous voyez "Running on http://127.0.0.1:5000".*
+
+3.  **Accéder à l'interface** :
+    Ouvrez votre navigateur et allez à l'adresse : [http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+## 5. Guide d'Utilisation
+
+Une fois l'interface lancée, vous avez accès à trois zones principales :
+
+*   **🏠 Dashboard** :
+    *   Vue d'ensemble de l'état du système.
+    *   Indicateurs clés de performance et graphiques sommaires.
+
+*   **👨‍💻 Zone Programmeur (Expert)** :
+    *   *Entraînement* : C'est ici que vous créez l'intelligence du système.
+        1. Sélectionnez un algorithme (ex: Random Forest, Logistic Regression).
+        2. Choisissez les indicateurs (features) à utiliser.
+        3. Activez ou non l'optimisation (GridSearch).
+        4. Lancez ! Le système gère tout le processus complexe (split temporel, évaluation) et vous affiche les résultats.
+    *   *Visualisation* : Analysez la qualité des modèles via les courbes ROC, matrices de confusion et l'importance des variables.
+
+*   **👤 Zone Utilisateur (Trader)** :
+    *   *Prédiction* : L'outil d'aide à la décision. Cliquez pour obtenir une recommandation (ACHAT / VENTE / ATTENTE) en temps réel, basée sur le meilleur modèle actuellement entraîné et validé par le système.
+
+## 6. Structure des Dossiers clé
+Pour vous repérer dans le code :
+
+*   `api/` : Cerveau du système. Contient le code du backend FastAPI (`main.py`) et la logique de trading.
+*   `app/` : Visage du système. Contient le code du frontend Flask (`app.py`) et les fichiers HTML/CSS (`templates/`, `static/`).
+*   `data/` : Coffre-fort. Stocke les données brutes (M1), agrégées (M15) et les features calculées.
+*   `models/` : Mémoire du système. Sauvegarde automatiquement les modèles entraînés (`.pkl`) et leurs rapports de performance.
+*   `notebooks/` : Laboratoire de recherche. Contient les notebooks d'exploration et le `Master_Trading_Notebook.ipynb` pour l'analyse approfondie.
