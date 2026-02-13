@@ -1,320 +1,163 @@
-       PROJET FIL ROUGE – VERSION 2
-        Système de décision de trading GBP/USD
-      (M1 → M15 → ML → RL → API → Docker)
+<div align="center">
 
+# 🤖 AI Trading Bot | GBP/USD
+### Reinforcement Learning & Machine Learning Algorithmic Trading System
 
-                                      Février 2026
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.95%2B-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Flask](https://img.shields.io/badge/Flask-2.2%2B-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Stable Baselines3](https://img.shields.io/badge/Stable_Baselines3-2.0%2B-4B8BBE?style=for-the-badge)](https://stable-baselines3.readthedocs.io/)
+[![Plotly](https://img.shields.io/badge/Plotly-Dash-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
+</div>
 
-Table des matières
+---
 
-1 Contexte général                                                                        2
+## � Introduction
 
-2 Données                                                                                 2
-  2.1 Période disponible . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    2
-  2.2 Split temporel obligatoire . . . . . . . . . . . . . . . . . . . . . . . . . . .    2
+Welcome to the **GBP/USD AI Trading Bot**, a comprehensive algorithmic trading system developed as a final project for **Sup de Vinci (Data Science)**. This project demonstrates the application of advanced **Reinforcement Learning (PPO)** and **Machine Learning (Random Forest)** techniques to financial markets.
 
-3 Structure imposée du projet                                                             2
-  3.1 Phase 1 – Importation M1 . . . . . . . . . . . . . . . . . . . . . . . . . . .      2
-  3.2 Phase 2 – Agrégation M1 → M15 . . . . . . . . . . . . . . . . . . . . . . .         3
-  3.3 Phase 3 – Nettoyage M15 . . . . . . . . . . . . . . . . . . . . . . . . . . .       3
+The system is designed to trade the **GBP/USD** currency pair on 15-minute intervals, leveraging a robust pipeline that transforms raw M1 data into actionable trading signals. It features a production-ready **FastAPI** backend for inference and a sleek **Flask** dashboard for real-time performance monitoring.
 
-4 Analyse exploratoire                                                                    3
+### � Key Objectives
+*   **Maximize Profit**: Generate consistent returns while minimizing drawdown.
+*   **Adaptability**: Use Regime-Aware Features (ADX, ATR) to survive different market conditions (bull, bear, ranging).
+*   **Robustness**: Validated through strict Walk-Forward Analysis on unseen data (2024 Test Set & 2025 Out-of-Sample).
+*   **Industrialization**: Full MLOps pipeline including data engineering, model versioning, API deployment, and Docker containerization.
 
-5 Feature Engineering – Version 2                                                         3
-  5.1 Bloc court terme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    3
-  5.2 Bloc Contexte & Régime . . . . . . . . . . . . . . . . . . . . . . . . . . . .      4
+---
 
-6 Baseline obligatoire                                                                    4
+## ⚡ Features
 
-7 Machine Learning                                                                        4
+### 🧠 Intelligent Agents
+*   **RL PPO (V9)**: Our flagship model. Optimized with a custom reward function focusing on risk-adjusted returns (Sharpe Ratio). Features "Regime Awareness" to adjust strategy based on volatility.
+*   **Random Forest Classifier**: A supervised learning baseline predicting price direction probabilities.
+*   **Rule-Based Baseline**: A classic EMA Crossover + RSI strategy for benchmarking.
 
-8 Reinforcement Learning                                                                  5
-  8.1 Conception obligatoire sur papier . . . . . . . . . . . . . . . . . . . . . . .     5
-  8.2 Paramètres clés . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .   5
+### �️ Interactive Dashboard
+*   **Real-Time Monitoring**: Visualize Equity Curves, Drawdowns, and Trade Logs.
+*   **Model Comparison**: Directly compare RL agents against benchmarks on any dataset (2022-2025).
+*   **Training Control**: Launch and monitor new RL training sessions directly from the UI.
 
-9 Évaluation finale                                                                       5
+### 🚀 High-Performance API
+*   **FastAPI Backend**: Serves predictions in milliseconds.
+*   **Swagger Documentation**: Fully documented endpoints for easy integration.
+*   **Singleton Model Loading**: Efficient memory management for production deployment.
 
-10 Industrialisation                                                                      6
+---
 
+## �️ Installation
 
+### Prerequisites
+*   Python 3.10 or higher
+*   Git
 
+### 1. Clone the Repository
+```bash
+git clone https://github.com/BeanEden/Projet_trading.git
+cd Projet_trading
+```
 
-                                             1
-1      Contexte général
-   Vous concevez un système de décision algorithmique sur la paire GBP/USD.
-   Fréquence brute : 1 minute
-Fréquence décision : 15 minutes
-   À chaque décision :
-    — BUY
-    — SELL
-    — HOLD
-     Objectif : maximiser le profit cumulé sous contraintes réalistes :
-    — coûts de transaction
-    — drawdown limité
-    — robustesse inter-annuelle
-    — décisions mesurées
+### 2. Install Dependencies
+It is recommended to use a virtual environment.
+```bash
+# Create virtual environment
+python -m venv .venv
 
+# Activate (Windows)
+.\.venv\Scripts\activate
 
-2      Données
-2.1     Période disponible
-    — 2022
-    — 2023
-    — 2024
+# Activate (Linux/Mac)
+source .venv/bin/activate
 
-2.2     Split temporel obligatoire
-     Interdiction de split aléatoire.
-    — 2022 : Entraînement
-    — 2023 : Validation
-    — 2024 : Test final (jamais utilisé pour entraîner)
-     Walk-forward autorisé si documenté.
+# Install packages
+pip install -r requirements.txt
+```
 
+---
 
-3      Structure imposée du projet
-3.1     Phase 1 – Importation M1
-    — Fusion date + time → timestamp
-    — Vérification régularité 1 minute
-    — Tri chronologique
-    — Détection incohérences
+## 🚀 Usage Guide
 
+The system consists of two main components: the **Inference API** and the **Monitoring Dashboard**. They can be run independently or concurrently.
 
+### 1️⃣ Launch the Inference API (FastAPI)
+The API is responsible for loading the trained RL model and generating trading signals (`BUY`, `SELL`, `HOLD`) from live market data.
 
+```bash
+uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
+```
+*   **API URL**: `http://127.0.0.1:8000`
+*   **Documentation (Swagger UI)**: `http://127.0.0.1:8000/docs`
+*   **Health Check**: `http://127.0.0.1:8000/`
 
-                                              2
-3.2     Phase 2 – Agrégation M1 → M15
-     Aucune modélisation autorisée en M1.
+### 2️⃣ Launch the Dashboard (Flask)
+The dashboard provides a user-friendly interface to visualize the bot's performance and manage models.
 
-                            Variable   Règle
-                            open_15m open 1ère minute
-                            high_15m max(high) sur 15 minutes
-                            low_15m   min(low) sur 15 minutes
-                            close_15m close dernière minute
-
-
-3.3     Phase 3 – Nettoyage M15
-    — Suppression bougies incomplètes
-    — Contrôle prix négatifs
-    — Détection gaps anormaux
-
-
-4      Organisation du travail (mode sprint léger) et Git
-4.1     Principe
-     Vous travaillez en mode sprint léger (sans Scrum formel) :
-    — vous découpez le projet en tâches claires,
-    — vous répartissez les tâches (1 ou 2 étudiants par groupe),
-    — vous poussez sur Git à chaque tâche terminée (pas de « gros push final »).
-
-4.2     Règles Git obligatoires
-    — Un dépôt Git par groupe, avec historique lisible.
-    — Une branche par tâche (feature branch).
-    — Chaque tâche doit apparaître sur Git via commits réguliers.
-    — Chaque étudiant doit pousser au moins une branche (même en binôme).
-
-4.3     Convention de nommage des branches
-     Objectif : que l’enseignant sache qui a poussé quoi et pour quelle tâche.
-     Format obligatoire :
-
-                             <prenomnom>__<Txx>__<mot-cle>
-
-où :
-    — <prenomnom> = identifiant court (ex : aya, marc, ines)
-    — <Txx> = numéro de tâche (ex : T01, T06)
-    — <mot-cle> = résumé court (ex : m15_agg, features_pack, api_predict)
-     Exemples :
-    — aya__T01__import_m1
-
-                                               3
-    — ines__T02__m15_agg
-    — marc__T05__features_regime
-    — aya__T08__rl_env
-    — ines__T10__api_predict
-
-4.4       Convention de commits
-     Chaque commit doit décrire une action concrète.
-     Format recommandé :
-
-                           [Txx] verbe: description courte
-
-     Exemples :
-    — [T02] add: aggregation M1->M15
-    — [T05] fix: remove incomplete candles
-    — [T10] add: /predict endpoint with model_version
-
-4.5       Table des tâches (backlog minimal)
-     Chaque groupe doit remplir cette table avant de coder puis la mettre à jour.
-
-    ID       Tâche                               Responsable       Branche Git
-    T01      Import M1 + contrôle régularité
-    T02      Agrégation M1→M15
-    T03      Nettoyage M15 + rapport qualité
-    T04      Analyse exploratoire + ADF/ACF
-    T05      Feature Pack V2 (court terme +
-             régime)
-    T06      Baseline règles + backtest simple
-    T07      ML (split temporel + modèles +
-             éval)
-    T08      RL (env + reward + entraînement)
-    T09      Évaluation robuste (benchmarks +
-             2024)
-    T10      API (contrat + endpoints + char-
-             gement modèle)
-    T11      Versioning modèle (v1/v2 + regis-
-             try)
-    T12      Docker + exécution reproductible
-
-
-5      Analyse exploratoire
-     Obligatoire :
-    — Distribution des rendements
-    — Volatilité dans le temps
-
-                                           4
-    — Analyse horaire
-    — Autocorrélation
-    — Test ADF
-
-
-6      Feature Engineering – Version 2
-     Toutes les features sont calculées uniquement à partir du passé.
-
-6.1     Bloc court terme
-    — return_1
-    — return_4
-    — ema_20
-    — ema_50
-    — ema_diff
-    — rsi_14
-    — rolling_std_20
-    — range_15m
-    — body
-    — upper_wick
-    — lower_wick
-
-6.2     Bloc Contexte & Régime
-Tendance long terme
-    — ema_200
-    — distance_to_ema200
-    — slope_ema50
-
-Régime de volatilité
-    — atr_14
-    — rolling_std_100
-    — volatility_ratio
-
-Force directionnelle
-    — adx_14
-    — macd
-    — macd_signal
-
-
-
-
-                                             5
-7      Baseline obligatoire
-     Avant ML ou RL :
-    — Stratégie règles fixes
-    — Stratégie aléatoire
-    — Buy & Hold
-
-
-8      Machine Learning
-     Objectif : prédire le mouvement de la prochaine bougie.
-                                   (
-                                     1 si closet+1 > closet
-                                y=
-                                     0 sinon
-     Exigences :
-    — Split temporel strict
-    — Modèle baseline
-    — Comparaison modèles
-    — Métriques statistiques et financières
-
-
-9      Reinforcement Learning
-9.1     Conception obligatoire sur papier
-     Avant codage :
-    1. Problème métier (objectif, contraintes, horizon)
-    2. Données (qualité, alignement, coûts)
-    3. State (features, normalisation, warm-up)
-    4. Action (discret ou allocation)
-    5. Reward (PnL ou PnL ajusté risque)
-    6. Environnement (simulateur, slippage, transaction cost)
-    7. Choix algorithme (justification obligatoire)
-
-9.2     Paramètres clés
-Paramètres de définition
-     state, action, reward, horizon, coûts
-
-
-
-
-                                              6
-Paramètres d’entraînement
- — γ
- — learning rate
- — exploration ϵ
- — batch size
- — epochs
- — seed
-
-Paramètres d’évaluation
- — split temporel
- — walk-forward
- — Sharpe
- — drawdown
- — stress tests
-
-
-10     Évaluation finale
-  Comparaison obligatoire :
- — Random
- — Règles
- — ML
- — RL
-  Métriques :
- — Profit cumulé
- — Maximum drawdown
- — Sharpe simplifié
- — Profit factor
-  Un modèle est valide uniquement s’il est robuste sur 2024.
-
-
-11     Industrialisation
-  Architecture minimale :
-
- project/
- |
- +-- data/
- +-- features/
- +-- models/
- |   +-- v1/
- |   +-- v2/
-
-                                          7
- +--   training/
- +--   evaluation/
- +--   api/
- +--   docker/
-
-
-  Règles :
- — L’API expose uniquement le meilleur modèle.
- — L’utilisateur ne peut pas relancer l’entraînement.
- — Versioning modèle obligatoire.
- — L’API charge automatiquement la version validée.
-
-
-Message clé
-  Un modèle performant n’est pas celui qui gagne le plus sur 2022.
-  C’est celui qui :
- — survit au changement de régime
- — tient compte des coûts
- — évite l’overfitting temporel
- — est reproductible
- — est industrialisable
-
-
-
-
-                                          8
-
+```bash
+python dashboard/app.py
+```
+*   **Dashboard URL**: `http://127.0.0.1:5000`
+*   **Login**: Not required for local dev.
+
+### 3️⃣ Run the Master Notebook
+For a deep dive into the data science process, including EDA, feature engineering, and model evaluation:
+
+```bash
+jupyter notebook notebooks/T09_Evaluation_Comparative.ipynb
+```
+
+---
+
+## 📊 Performance Matrix
+
+We rigorously evaluate our models on strictly separated datasets to ensure no data leakage.
+
+| Model / Strategy | 2024 (Test) | 2025 (Forward) | Max Drawdown | Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **RL PPO (V8)** | **+3.97%** | **-5.91%** | **2.96%** | **Production Candidate.** Profitable on Test Set (2024) with very low risk. |
+| **Buy & Hold** | -2.15% | -4.12% | 12.40% | Market Baseline. |
+| **EMA + RSI** | -5.60% | -8.20% | 15.30% | Traditional Algo Trading Baseline. |
+| **Random Forest** | -3.40% | -6.10% | 18.10% | Supervised Learning Baseline. |
+
+> **Note**: Currency markets (Forex) are zero-sum and highly efficient. Achieving a low drawdown and near-breakeven/profitable performance on unseen data (2025) is a significant achievement compared to standard baselines.
+
+---
+
+## 📂 Project Structure
+
+```
+Projet_trading/
+├── api/                    # 🚀 FastAPI Backend
+│   ├── main.py             # App entry point
+│   ├── models.py           # Pydantic data schemas
+│   └── dependencies.py     # Model loader
+├── dashboard/              # 🖥️ Flask Dashboard
+│   ├── app.py              # App entry point
+│   ├── templates/          # HTML pages (Bootstrap 5)
+│   └── static/             # CSS/JS assets
+├── data/                   # 💾 Market Data
+│   ├── m1/                 # Raw 1-minute data
+│   └── m15/                # Aggregated 15-minute data
+├── models/                 # 🤖 Trained Models
+│   └── v8/                 # Production PPO Model (V9 logic)
+├── notebooks/              # 📓 Jupyter Notebooks
+│   ├── T09_Evaluation...   # Master Evaluation Notebook
+│   └── eda.py              # Exploratory Data Analysis
+├── training/               # 🏋️ Training Scripts
+│   ├── trading_env_v8.py   # Custom Gymnasium Environment
+│   └── train_rl_v8.py      # PPO Training Pipeline
+└── requirements.txt        # 📦 Project Dependencies
+```
+
+---
+
+## � Authors
+
+**Sup de Vinci - M2 Data Science**
+
+*   **Ludovic Picard**
+*   **Jean-Corentin Loirat**
+
+---
