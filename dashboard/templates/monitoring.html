@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Analyses - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Analyses et Resultats</h1>
+
+<!-- ── Selecteur d'annee global ─────────────────────────────── -->
+<div class="d-flex gap-2 mb-4">
+    <span class="text-muted align-self-center me-2" style="font-size:0.9rem;">Donnees :</span>
+    <button class="btn btn-sm btn-outline-primary year-btn" data-year="2022">2022 (Train)</button>
+    <button class="btn btn-sm btn-outline-primary year-btn" data-year="2023">2023 (Val)</button>
+    <button class="btn btn-sm btn-outline-primary year-btn" data-year="2024">2024 (Test)</button>
+    <button class="btn btn-sm btn-outline-primary year-btn" data-year="2025">2025 (Test)</button>
+</div>
+
+<!-- ── Cours GBP/USD Candlestick ───────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Cours GBP/USD (M15) - Candlestick</div>
+    <div class="card-body p-2">
+        <div id="chart-price" style="width:100%; height:500px;"></div>
+    </div>
+</div>
+
+<!-- ── Distribution des rendements ─────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Distribution des rendements</div>
+    <div class="card-body p-2">
+        <div id="chart-returns" style="width:100%; height:400px;"></div>
+    </div>
+</div>
+
+<!-- ── Volatilite glissante ────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Volatilite glissante (rolling std)</div>
+    <div class="card-body p-2">
+        <div id="chart-vol" style="width:100%; height:400px;"></div>
+    </div>
+</div>
+
+<!-- ── Analyse horaire ─────────────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Analyse horaire</div>
+    <div class="card-body p-2">
+        <div class="row">
+            <div class="col-md-6">
+                <div id="chart-hourly-ret" style="width:100%;height:350px;"></div>
+            </div>
+            <div class="col-md-6">
+                <div id="chart-hourly-vol" style="width:100%;height:350px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Comparaison des strategies (bar chart) ──────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Comparaison des strategies (toutes annees)</div>
+    <div class="card-body p-2">
+        <div id="chart-metrics" style="width:100%; height:450px;"></div>
+    </div>
+</div>
+
+<!-- ── Tableau baseline coloré ─────────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">Resultats detailles par strategie</div>
+    <div class="card-body p-0">
+        {% if baseline_summary %}
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Annee</th>
+                        <th>Periode</th>
+                        <th>Strategie</th>
+                        <th class="text-end">Profit (%)</th>
+                        <th class="text-end">Max DD (%)</th>
+                        <th class="text-end">Sharpe</th>
+                        <th class="text-end">Profit Factor</th>
+                        <th class="text-end">Win Rate (%)</th>
+                        <th class="text-end">Nb Trades</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in baseline_summary %}
+                    <tr>
+                        <td>{{ row['Année'] }}</td>
+                        <td><span
+                                class="badge {% if row['Période'] == 'Train' %}bg-primary{% elif row['Période'] == 'Validation' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{
+                                row['Période'] }}</span></td>
+                        <td><strong>{{ row['Stratégie'] }}</strong></td>
+                        <td class="text-end">
+                            {% set profit = row['Profit (%)'] | float %}
+                            <span
+                                style="font-weight:600; color:{{ '#22c55e' if profit > 0 else '#ef4444' if profit < 0 else '#8b8fa3' }};">
+                                {{ "+" if profit > 0 }}{{ row['Profit (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set dd = row['Max DD (%)'] | float %}
+                            <span style="color:{{ '#22c55e' if dd > -5 else '#f59e0b' if dd > -20 else '#ef4444' }};">
+                                {{ row['Max DD (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set sharpe = row['Sharpe'] | float %}
+                            <span
+                                style="color:{{ '#22c55e' if sharpe > 1 else '#f59e0b' if sharpe > 0 else '#ef4444' }};">
+                                {{ row['Sharpe'] }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set pf = row['Profit Factor'] | float %}
+                            <span style="color:{{ '#22c55e' if pf > 1 else '#f59e0b' if pf > 0.8 else '#ef4444' }};">
+                                {{ row['Profit Factor'] }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% set wr = row['Win Rate (%)'] | float %}
+                            <span style="color:{{ '#22c55e' if wr > 50 else '#f59e0b' if wr > 40 else '#ef4444' }};">
+                                {{ row['Win Rate (%)'] }}%
+                            </span>
+                        </td>
+                        <td class="text-end text-muted">{{ row['Nb Trades'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+    const PLOTLY_LAYOUT = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#0f1117',
+        font: { color: '#8b8fa3', size: 12 },
+        margin: { t: 30, b: 50, l: 60, r: 20 },
+        xaxis: { gridcolor: 'rgba(255,255,255,0.05)' },
+        yaxis: { gridcolor: 'rgba(255,255,255,0.05)' },
+    };
+    const PLOTLY_CFG = { responsive: true, displayModeBar: true, displaylogo: false };
+
+    let currentYear = 2024;
+
+    // ── Year selector ──────────────────────────────────────
+    document.querySelectorAll('.year-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.year-btn').forEach(b => {
+                b.classList.remove('btn-primary', 'active');
+                b.classList.add('btn-outline-primary');
+            });
+            btn.classList.remove('btn-outline-primary');
+            btn.classList.add('btn-primary', 'active');
+            currentYear = parseInt(btn.dataset.year);
+            loadAllCharts();
+        });
+    });
+
+    // ── Candlestick ───────────────────────────────────────
+    async function loadPrice() {
+        const r = await fetch(`/api/price_data/${currentYear}`);
+        const d = await r.json();
+        if (d.error) return;
+        Plotly.newPlot('chart-price', [{
+            x: d.timestamp, open: d.open, high: d.high, low: d.low, close: d.close,
+            type: 'candlestick',
+            increasing: { line: { color: '#22c55e' }, fillcolor: '#22c55e' },
+            decreasing: { line: { color: '#ef4444' }, fillcolor: '#ef4444' },
+        }], {
+            ...PLOTLY_LAYOUT,
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, rangeslider: { visible: false }, type: 'category', nticks: 12 },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Prix (GBP/USD)' },
+        }, PLOTLY_CFG);
+    }
+
+    // ── Returns histogram ─────────────────────────────────
+    async function loadReturns() {
+        const r = await fetch(`/api/returns/${currentYear}`);
+        const d = await r.json();
+        if (d.error) return;
+        Plotly.newPlot('chart-returns', [{
+            x: d.centers, y: d.counts, type: 'bar',
+            marker: { color: d.centers.map(c => c >= 0 ? '#22c55e' : '#ef4444') },
+            hovertemplate: 'Rendement: %{x:.3f}%<br>Nb: %{y}<extra></extra>',
+        }], {
+            ...PLOTLY_LAYOUT,
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, title: 'Rendement (%)' },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Frequence' },
+            annotations: [{
+                x: d.mean, y: 0, xref: 'x', yref: 'y',
+                text: `Moy: ${d.mean.toFixed(4)}% | Std: ${d.std}%`,
+                showarrow: false, yshift: -25,
+                font: { color: '#0d6efd', size: 11 }
+            }],
+            bargap: 0.05,
+        }, PLOTLY_CFG);
+    }
+
+    // ── Volatility ────────────────────────────────────────
+    async function loadVol() {
+        const r = await fetch(`/api/volatility/${currentYear}`);
+        const d = await r.json();
+        if (d.error) return;
+        Plotly.newPlot('chart-vol', [
+            { x: d.timestamp, y: d.vol_1h, name: '1H', line: { color: '#0d6efd', width: 1 } },
+            { x: d.timestamp, y: d.vol_4h, name: '4H', line: { color: '#f59e0b', width: 1.5 } },
+            { x: d.timestamp, y: d.vol_1d, name: '1D', line: { color: '#ef4444', width: 2 } },
+        ], {
+            ...PLOTLY_LAYOUT,
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, type: 'category', nticks: 12 },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Volatilite (%)' },
+            legend: { orientation: 'h', y: 1.08 },
+        }, PLOTLY_CFG);
+    }
+
+    // ── Hourly analysis ───────────────────────────────────
+    async function loadHourly() {
+        const r = await fetch(`/api/hourly/${currentYear}`);
+        const d = await r.json();
+        if (d.error) return;
+        const colors = d.mean_return.map(v => v >= 0 ? '#22c55e' : '#ef4444');
+
+        Plotly.newPlot('chart-hourly-ret', [{
+            x: d.hours, y: d.mean_return, type: 'bar',
+            marker: { color: colors },
+            hovertemplate: '%{x}h: %{y:.4f}%<extra></extra>',
+        }], {
+            ...PLOTLY_LAYOUT,
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, title: 'Heure (UTC)', dtick: 1 },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Rendement moyen (%)' },
+            margin: { ...PLOTLY_LAYOUT.margin, t: 10 },
+        }, PLOTLY_CFG);
+
+        Plotly.newPlot('chart-hourly-vol', [{
+            x: d.hours, y: d.volatility, type: 'bar',
+            marker: { color: '#0d6efd' },
+            hovertemplate: '%{x}h: %{y:.4f}%<extra></extra>',
+        }], {
+            ...PLOTLY_LAYOUT,
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, title: 'Heure (UTC)', dtick: 1 },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Volatilite moyenne (%)' },
+            margin: { ...PLOTLY_LAYOUT.margin, t: 10 },
+        }, PLOTLY_CFG);
+    }
+
+    // ── Metrics comparison (all years, static) ────────────
+    async function loadMetrics() {
+        const r = await fetch('/api/metrics_comparison');
+        const d = await r.json();
+        if (d.error) return;
+        Plotly.newPlot('chart-metrics', [
+            { x: d.labels, y: d.profits, name: 'Profit (%)', type: 'bar', marker: { color: d.profits.map(v => v >= 0 ? '#22c55e' : '#ef4444') } },
+            { x: d.labels, y: d.sharpes, name: 'Sharpe', type: 'bar', marker: { color: '#0d6efd' } },
+            { x: d.labels, y: d.win_rates, name: 'Win Rate (%)', type: 'bar', marker: { color: '#f59e0b' } },
+        ], {
+            ...PLOTLY_LAYOUT,
+            barmode: 'group',
+            xaxis: { ...PLOTLY_LAYOUT.xaxis, tickangle: -30 },
+            yaxis: { ...PLOTLY_LAYOUT.yaxis, title: 'Valeur' },
+            legend: { orientation: 'h', y: 1.12 },
+        }, PLOTLY_CFG);
+    }
+
+    function loadAllCharts() {
+        loadPrice();
+        loadReturns();
+        loadVol();
+        loadHourly();
+    }
+
+    // Initial load
+    loadAllCharts();
+    loadMetrics();
+</script>
+{% endblock %}

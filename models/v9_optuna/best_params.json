@@ -1,0 +1,9 @@
+{
+    "learning_rate": 3.588718663567105e-05,
+    "batch_size": 128,
+    "n_steps": 2048,
+    "ent_coef": 0.0009363222680365391,
+    "clip_range": 0.1,
+    "gamma": 0.999,
+    "net_arch": "large"
+}

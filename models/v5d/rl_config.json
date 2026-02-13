@@ -1,0 +1,9 @@
+{
+    "algorithm": "PPO",
+    "window_size": 30,
+    "spread": 0.00015,
+    "take_profit_pct": 0.0015,
+    "stop_loss_pct": 0.003,
+    "max_hold": 32,
+    "cooldown": 4
+}

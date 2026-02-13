@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Comparaison des Modèles - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Comparaison des Modèles</h1>
+
+<!-- ── Graphique d'Évolution (Capital) ─────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-graph-up-arrow me-2"></i>Évolution du Capital (Simulation 10k$)
+    </div>
+    <div class="card-body p-2">
+        <div id="chart-growth" style="width:100%; height:500px;"></div>
+        <div class="text-center text-muted small mt-2">
+            Projection basée sur les rendements annuels composés. Départ 10 000 $.
+        </div>
+    </div>
+</div>
+
+<!-- ── Tableau Comparatif (Matrice) ────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-table me-2"></i>Matrice de Performance (Profit %)
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Modèle</th>
+                        <th class="text-end">2022</th>
+                        <th class="text-end">2023</th>
+                        <th class="text-end">2024</th>
+                        <th class="text-end">2025 (Test)</th>
+                        <th>Méthode</th>
+                        <th class="text-end fw-bold" data-bs-toggle="tooltip"
+                            title="Performance composée sur les 4 ans">Total (Cumul) ℹ️</th>
+                        <th class="text-end" data-bs-toggle="tooltip" title="Moyenne arithmétique des Win Rates">Win
+                            Rate Avg ℹ️</th>
+                    </tr>
+                </thead>
+                <tbody id="comparison-body">
+                    <!-- Rempli par JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Tableau Comparatif (Win Rate) ────────────────────────── -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-crosshair me-2"></i>Matrice de Précision (Win Rate %)
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Modèle</th>
+                        <th class="text-end">2022</th>
+                        <th class="text-end">2023</th>
+                        <th class="text-end">2024</th>
+                        <th class="text-end">2025</th>
+                    </tr>
+                </thead>
+                <tbody id="comparison-wr-body">
+                    <!-- Rempli par JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script>
+    const PLOTLY_LAYOUT = {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#0f1117',
+        font: { color: '#8b8fa3', size: 12 },
+        margin: { t: 30, b: 50, l: 60, r: 20 },
+        xaxis: { gridcolor: 'rgba(255,255,255,0.05)', title: 'Année' },
+        yaxis: { gridcolor: 'rgba(255,255,255,0.05)', title: 'Capital ($)' },
+        legend: { orientation: 'h', y: 1.1 },
+        hovermode: 'x unified'
+    };
+    const PLOTLY_CFG = { responsive: true, displayModeBar: false };
+
+    async function loadData() {
+        try {
+            const r = await fetch('/api/models_comparison');
+            const data = await r.json();
+            renderTable(data);
+            renderChart(data);
+        } catch (e) {
+            console.error("Erreur chargement données:", e);
+        }
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('comparison-body');
+        const tbodyWr = document.getElementById('comparison-wr-body');
+        tbody.innerHTML = '';
+        if (tbodyWr) tbodyWr.innerHTML = '';
+
+        // Trier les modèles pour avoir V1, V2... V9, V10
+        const models = Object.keys(data).sort((a, b) => {
+            const na = parseInt(a.replace(/\D/g, '')) || 0;
+            const nb = parseInt(b.replace(/\D/g, '')) || 0;
+            return na - nb;
+        });
+
+        models.forEach(model => {
+            const res = data[model];
+            const years = ['2022', '2023', '2024', '2025'];
+
+            // ── Ligne Profit ──
+            let html = `<tr><td><span class="badge bg-secondary">${model.toUpperCase()}</span></td>`;
+            let capital = 10000;
+            let totalWinRate = 0;
+            let count = 0;
+
+            years.forEach(y => {
+                if (res[y]) {
+                    const p = res[y].profit_pct;
+                    const color = p >= 0 ? 'text-success' : 'text-danger';
+                    const sign = p >= 0 ? '+' : '';
+                    html += `<td class="text-end ${color} fw-bold">${sign}${p.toFixed(2)}%</td>`;
+
+                    capital *= (1 + p / 100);
+                    totalWinRate += res[y].win_rate || 0;
+                    count++;
+                } else {
+                    html += `<td class="text-end text-muted">-</td>`;
+                }
+            });
+
+            const totalPerf = ((capital - 10000) / 10000) * 100;
+            const totalColor = totalPerf >= 0 ? 'text-success' : 'text-danger';
+            const avgWinRate = count > 0 ? (totalWinRate / count).toFixed(1) : '-';
+
+            if (res.meta) {
+                html += `<td class="text-start"><small class="text-muted">${res.meta.method}</small></td>`;
+            } else {
+                html += `<td></td>`;
+            }
+
+            html += `<td class="text-end fw-bold ${totalColor}">${(totalPerf >= 0 ? '+' : '')}${totalPerf.toFixed(2)}%</td>`;
+            html += `<td class="text-end">${avgWinRate}%</td>`;
+            html += `</tr>`;
+            tbody.innerHTML += html;
+
+            // ── Ligne Win Rate (si le tableau existe) ──
+            if (tbodyWr) {
+                let htmlWr = `<tr><td><span class="badge bg-secondary">${model.toUpperCase()}</span></td>`;
+                years.forEach(y => {
+                    if (res[y]) {
+                        const wr = res[y].win_rate;
+                        // Colorier si bon win rate (>50%)
+                        const color = wr >= 50 ? 'text-success' : 'text-muted';
+                        htmlWr += `<td class="text-end ${color}">${wr.toFixed(1)}%</td>`;
+                    } else {
+                        htmlWr += `<td class="text-end text-muted">-</td>`;
+                    }
+                });
+                htmlWr += `</tr>`;
+                tbodyWr.innerHTML += htmlWr;
+            }
+        });
+    }
+
+    function renderChart(data) {
+        const traces = [];
+        const models = Object.keys(data).sort((a, b) => {
+            const na = parseInt(a.replace(/\D/g, '')) || 0;
+            const nb = parseInt(b.replace(/\D/g, '')) || 0;
+            return na - nb;
+        });
+
+        models.forEach(model => {
+            const res = data[model];
+            // Construire la courbe : Départ 2021 (10k), Fin 2022, Fin 2023...
+            const x = [2021, 2022, 2023, 2024, 2025];
+            const y = [10000];
+            let current = 10000;
+
+            // Années successives
+            ['2022', '2023', '2024', '2025'].forEach(year => {
+                if (res[year]) {
+                    current *= (1 + res[year].profit_pct / 100);
+                }
+                y.push(current);
+            });
+
+            // Ne pas tracer si pas de données
+            if (y.length <= 1) return;
+
+            // Style special pour V9/V10
+            let width = 2;
+            let opacity = 0.6;
+            if (model.includes('v9') || model.includes('v10')) {
+                width = 4;
+                opacity = 1.0;
+            }
+
+            traces.push({
+                x: x,
+                y: y,
+                name: model.toUpperCase(),
+                mode: 'lines+markers',
+                line: { width: width },
+                opacity: opacity
+            });
+        });
+
+        Plotly.newPlot('chart-growth', traces, PLOTLY_LAYOUT, PLOTLY_CFG);
+    }
+
+    // Init
+    loadData();
+</script>
+{% endblock %}

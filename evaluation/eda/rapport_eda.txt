@@ -1,0 +1,34 @@
+======================================================================
+RAPPORT D'ANALYSE EXPLORATOIRE – GBP/USD M15
+======================================================================
+
+1. DONNÉES
+   Période        : 2022-01-02 17:00:00 → 2024-12-31 16:45:00
+   Observations   : 71,446
+   2022 (     Train) : 24,937 bougies
+   2023 (Validation) : 21,563 bougies
+   2024 (      Test) : 24,946 bougies
+
+2. STATISTIQUES DES RENDEMENTS
+   Moyenne        : -0.00000088
+   Écart-type     : 0.000638
+   Skewness       : -1.8601
+   Kurtosis       : 134.2025
+   Min            : -0.032972
+   Max            : 0.016397
+   Jarque-Bera    : stat=53648058.77, p=0.00e+00
+   Normalité      : NON
+
+3. TEST ADF (STATIONNARITÉ)
+   Prix (close_15m).............. ADF=-2.3337  p=1.61e-01  → NON STATIONNAIRE
+   Rendements.................... ADF=-34.3320  p=0.00e+00  → STATIONNAIRE
+   Log-rendements................ ADF=-34.3085  p=0.00e+00  → STATIONNAIRE
+
+4. FIGURES GÉNÉRÉES
+   00_prix_overview.png           – Prix et rendements cumulés
+   01_distribution_rendements.png – Histogramme + QQ plot
+   02_volatilite.png              – Volatilité glissante et mensuelle
+   03_analyse_horaire.png         – Rendement/volatilité par heure
+   04_autocorrelation.png         – ACF/PACF
+
+======================================================================

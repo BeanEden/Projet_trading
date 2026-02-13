@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr" data-bs-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GBP/USD Trading Bot{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #0d6efd;
+            --accent-soft: rgba(13, 110, 253, 0.15);
+            --bg-sidebar: #0f1117;
+            --bg-main: #151820;
+            --bg-card: #1c1f2b;
+            --border: rgba(255, 255, 255, 0.06);
+            --text-muted: #8b8fa3;
+        }
+
+        body {
+            background: var(--bg-main);
+            color: #e1e4ea;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 240px;
+            height: 100vh;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 0;
+            z-index: 100;
+        }
+
+        .sidebar .brand {
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 0 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .sidebar .brand small {
+            display: block;
+            font-weight: 400;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        .sidebar .nav-link {
+            color: var(--text-muted);
+            padding: 0.6rem 1.25rem;
+            font-size: 0.9rem;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .sidebar .nav-link.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: var(--accent-soft);
+        }
+
+        .sidebar .nav-link i {
+            width: 24px;
+            margin-right: 8px;
+        }
+
+        .main-content {
+            margin-left: 240px;
+            padding: 2rem 2.5rem;
+            min-height: 100vh;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #fff;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-accent {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .table {
+            --bs-table-bg: transparent;
+            --bs-table-color: #e1e4ea;
+            font-size: 0.9rem;
+        }
+
+        .table th {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-color: var(--border);
+        }
+
+        .table td {
+            border-color: var(--border);
+            vertical-align: middle;
+        }
+
+        .img-chart {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        iframe {
+            border: none;
+            border-radius: 8px;
+        }
+
+        pre.log-output {
+            background: #0d0f14;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.85rem;
+            color: #a8b2c1;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="sidebar">
+        <div class="brand">
+            Trading Bot
+            <small>GBP/USD - PPO Agent</small>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                    <i class="bi bi-grid-1x2"></i>Tableau de bord
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.path == '/monitoring' %}active{% endif %}" href="/monitoring">
+                    <i class="bi bi-graph-up"></i>Analyses
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.path == '/comparison' %}active{% endif %}" href="/comparison">
+                    <i class="bi bi-bar-chart-steps"></i>Comparaison
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.path == '/training' %}active{% endif %}" href="/training">
+                    <i class="bi bi-cpu"></i>Entrainement
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.path == '/api_docs' %}active{% endif %}" href="/api_docs">
+                    <i class="bi bi-braces"></i>API Documentation
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

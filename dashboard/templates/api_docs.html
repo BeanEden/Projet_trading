@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}API Documentation - Trading Bot{% endblock %}
+
+{% block content %}
+<h1 class="page-title">API Documentation</h1>
+<div class="card">
+    <div class="card-body p-0">
+        <iframe src="http://127.0.0.1:8000/docs"
+            style="width:100%; height:calc(100vh - 150px); border-radius:10px;"></iframe>
+    </div>
+</div>
+{% endblock %}

@@ -29,7 +29,7 @@ DATA_DIR = PROJECT_ROOT / "data" / "m15"
 OUTPUT_DIR = PROJECT_ROOT / "evaluation" / "baseline_results"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-YEARS = {2022: "Train", 2023: "Validation", 2024: "Test"}
+YEARS = {2022: "Train", 2023: "Validation", 2024: "Test", 2025: "External Validation"}
 TRANSACTION_COST = 0.0002  # ~2 pips
 SEED = 42
 FIGSIZE = (16, 10)
@@ -152,7 +152,7 @@ def run_all_baselines():
 # ── Visualisation ───────────────────────────────────────────────────────────
 def plot_equity_curves(all_results: dict):
     """Trace les courbes d'equity pour chaque année."""
-    fig, axes = plt.subplots(1, 3, figsize=(20, 6), sharey=False)
+    fig, axes = plt.subplots(1, len(YEARS), figsize=(5*len(YEARS), 6), sharey=False)
     colors = {"Random": "#e74c3c", "Buy & Hold": "#3498db", "EMA Cross + RSI": "#2ecc71"}
 
     for idx, (year, label) in enumerate(YEARS.items()):
